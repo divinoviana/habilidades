@@ -1,0 +1,7 @@
+{
+  "name": "Sistema Avaliativo Federico - Ciências Humanas",
+  "description": "Sistema avançado de avaliação baseado em IA (Padrão ENEM/TRI) para a Escola Estadual Federico José Pedreira Neto, com monitoramento anti-cola e feedbacks personalizados.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
