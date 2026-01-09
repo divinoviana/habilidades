@@ -10,6 +10,12 @@ interface TeacherDashboardProps {
   settings: GlobalSettings;
 }
 
+const CLASSES_BY_GRADE: { [key: string]: string[] } = {
+  "1ª": ["13.01", "13.02", "13.03", "13.04", "13.05", "13.06"],
+  "2ª": ["23.01", "23.02", "23.03", "23.04", "23.05", "23.06", "23.07", "23.08"],
+  "3ª": ["33.01", "33.02", "33.03", "33.04", "33.05", "33.06", "33.07", "33.08"]
+};
+
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settings }) => {
   const [activeTab, setActiveTab] = useState<'topics' | 'activities' | 'messages' | 'profile'>('topics');
   const [selectedSubject, setSelectedSubject] = useState<Subject>('História');
@@ -28,12 +34,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   const [submissions, setSubmissions] = useState<ActivitySubmission[]>([]);
   const [viewingResults, setViewingResults] = useState<string | null>(null);
 
-  const classes = ["Todas", "13.01", "13.02", "13.03", "13.04", "13.05", "13.06", "23.01", "23.02", "33.01"];
-
   useEffect(() => {
     fetchTopics();
     fetchMyActivities();
   }, []);
+
+  // Resetar turma ao mudar de série
+  useEffect(() => {
+    setSelectedClass('Todas');
+  }, [selectedGrade]);
 
   const fetchTopics = async () => {
     const { data } = await supabase.from('topics').select('*').eq('teacher_id', currentUser.id);
@@ -110,6 +119,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
     setLoading(false);
   };
 
+  const currentAvailableClasses = ["Todas", ...(CLASSES_BY_GRADE[selectedGrade] || [])];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2 overflow-x-auto pb-2">
@@ -143,17 +154,23 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
               <div className="flex-1 space-y-6 bg-slate-50 p-6 rounded-3xl border border-slate-100">
                 <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Sparkles className="text-blue-600"/> Nova Atividade Extra por IA</h3>
                 <div className="grid grid-cols-2 gap-3">
-                  <select className="px-3 py-2 bg-white border rounded-xl text-sm" value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value as Subject)}>
-                    <option>História</option><option>Filosofia</option><option>Geografia</option><option>Sociologia</option>
-                  </select>
-                  <select className="px-3 py-2 bg-white border rounded-xl text-sm" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
-                    <option>1ª</option><option>2ª</option><option>3ª</option>
-                  </select>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Disciplina</label>
+                    <select className="w-full px-3 py-2 bg-white border rounded-xl text-sm" value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value as Subject)}>
+                      <option>História</option><option>Filosofia</option><option>Geografia</option><option>Sociologia</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400">Série</label>
+                    <select className="w-full px-3 py-2 bg-white border rounded-xl text-sm" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
+                      <option>1ª</option><option>2ª</option><option>3ª</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400">Turma (Opcional)</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400">Turma (Destino)</label>
                   <select className="w-full px-3 py-2 bg-white border rounded-xl text-sm" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
-                    {classes.map(c => <option key={c} value={c}>{c}</option>)}
+                    {currentAvailableClasses.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -189,7 +206,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                     <div key={act.id} className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm hover:border-blue-500 transition-all">
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{act.subject} • {act.grade} Série {act.className ? `• ${act.className}` : ''}</p>
+                          <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{act.subject} • {act.grade} Série {act.className ? `• ${act.className}` : '• Todas as Turmas'}</p>
                           <h4 className="font-bold text-slate-800">{act.theme}</h4>
                         </div>
                         <button 
