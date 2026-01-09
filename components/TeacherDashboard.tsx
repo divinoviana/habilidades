@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserProfile, GlobalSettings, Subject, Topic, ExtraActivity, ActivitySubmission } from '../types';
-import { BookOpen, ClipboardList, MessageSquare, KeyRound, CheckCircle2, Loader2, FilePlus, ListChecks, Sparkles, Send, Users } from 'lucide-react';
+import { UserProfile, GlobalSettings, Subject, Topic, ExtraActivity, ActivitySubmission, UserRole } from '../types';
+import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Search } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateExtraActivity } from '../services/geminiService';
 
@@ -17,12 +17,18 @@ const CLASSES_BY_GRADE: { [key: string]: string[] } = {
 };
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settings }) => {
-  const [activeTab, setActiveTab] = useState<'topics' | 'activities' | 'messages' | 'profile'>('topics');
+  const [activeTab, setActiveTab] = useState<'topics' | 'activities' | 'carometro' | 'profile'>('topics');
   const [selectedSubject, setSelectedSubject] = useState<Subject>('História');
   const [selectedGrade, setSelectedGrade] = useState('1ª');
   const [selectedClass, setSelectedClass] = useState('Todas');
   const [loading, setLoading] = useState(false);
   
+  // Carômetro State
+  const [carometroGrade, setCarometroGrade] = useState('1ª');
+  const [carometroClass, setCarometroClass] = useState('Todas');
+  const [students, setStudents] = useState<UserProfile[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+
   // Topics State
   const [topicsList, setTopicsList] = useState<Topic[]>([]);
   const [newTopic, setNewTopic] = useState('');
@@ -39,7 +45,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
     fetchMyActivities();
   }, []);
 
-  // Resetar turma ao mudar de série
+  // Busca estudantes para o carômetro
+  useEffect(() => {
+    if (activeTab === 'carometro') {
+      fetchStudentsForCarometro();
+    }
+  }, [activeTab, carometroGrade, carometroClass]);
+
+  // Resetar turma ao mudar de série (na aba atividades)
   useEffect(() => {
     setSelectedClass('Todas');
   }, [selectedGrade]);
@@ -54,8 +67,35 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
     if (data) setMyActivities(data.map(d => ({ ...d, teacherId: d.teacher_id, createdAt: d.created_at })));
   };
 
+  const fetchStudentsForCarometro = async () => {
+    setLoadingStudents(true);
+    let query = supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'student')
+      .eq('grade', carometroGrade);
+    
+    if (carometroClass !== 'Todas') {
+      query = query.eq('class_name', carometroClass);
+    }
+
+    const { data } = await query.order('full_name');
+    if (data) {
+      setStudents(data.map(u => ({
+        id: u.id,
+        email: u.email,
+        fullName: u.full_name,
+        role: u.role as UserRole,
+        grade: u.grade,
+        className: u.class_name,
+        avatarUrl: u.avatar_url
+      })));
+    }
+    setLoadingStudents(false);
+  };
+
   const fetchSubmissions = async (activityId: string) => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('activity_submissions')
       .select('*, profiles(full_name)')
       .eq('activity_id', activityId);
@@ -120,12 +160,14 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   };
 
   const currentAvailableClasses = ["Todas", ...(CLASSES_BY_GRADE[selectedGrade] || [])];
+  const carometroAvailableClasses = ["Todas", ...(CLASSES_BY_GRADE[carometroGrade] || [])];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2 overflow-x-auto pb-2">
         <button onClick={() => setActiveTab('topics')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'topics' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border'}`}><BookOpen size={18}/> Planejamento</button>
         <button onClick={() => setActiveTab('activities')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'activities' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border'}`}><FilePlus size={18}/> Atividades Extras</button>
+        <button onClick={() => setActiveTab('carometro')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'carometro' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border'}`}><Contact2 size={18}/> Carômetro</button>
         <button onClick={() => setActiveTab('profile')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'profile' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border'}`}><KeyRound size={18}/> Minha Senha</button>
       </div>
 
@@ -145,6 +187,59 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
             <button onClick={handleSaveTopic} disabled={loading || !newTopic} className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl flex justify-center gap-2">
               {loading ? <Loader2 className="animate-spin" size={20}/> : <Send size={18}/>} Enviar para o Admin
             </button>
+          </div>
+        )}
+
+        {activeTab === 'carometro' && (
+          <div className="space-y-8">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-b pb-6">
+              <div>
+                <h3 className="font-bold text-slate-800 text-2xl">Carômetro da Escola</h3>
+                <p className="text-slate-500 text-sm">Identifique visualmente os estudantes da sua turma.</p>
+              </div>
+              <div className="flex gap-3 w-full md:w-auto">
+                <select className="px-4 py-2 bg-slate-50 border rounded-xl font-bold text-sm" value={carometroGrade} onChange={(e) => setCarometroGrade(e.target.value)}>
+                  <option>1ª</option><option>2ª</option><option>3ª</option>
+                </select>
+                <select className="px-4 py-2 bg-slate-50 border rounded-xl font-bold text-sm min-w-[120px]" value={carometroClass} onChange={(e) => setCarometroClass(e.target.value)}>
+                  {carometroAvailableClasses.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {loadingStudents ? (
+              <div className="flex flex-col items-center justify-center py-24 text-slate-400 gap-4">
+                <Loader2 className="animate-spin" size={40} />
+                <p className="font-bold">Carregando lista de alunos...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                {students.map(student => (
+                  <div key={student.id} className="bg-white group">
+                    <div className="aspect-[4/5] rounded-2xl overflow-hidden border-2 border-slate-100 mb-3 shadow-sm group-hover:border-blue-500 transition-all bg-slate-50 relative">
+                      {student.avatarUrl ? (
+                        <img src={student.avatarUrl} alt={student.fullName} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Users size={32} className="text-slate-200" />
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-900/60 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                         <p className="text-[8px] text-white font-bold uppercase tracking-wider">{student.className || student.grade + ' série'}</p>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <p className="font-bold text-slate-800 text-sm leading-tight line-clamp-2">{student.fullName}</p>
+                    </div>
+                  </div>
+                ))}
+                {students.length === 0 && (
+                  <div className="col-span-full py-12 text-center text-slate-400 italic bg-slate-50 rounded-3xl border-2 border-dashed">
+                    Nenhum estudante encontrado para estes filtros.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
