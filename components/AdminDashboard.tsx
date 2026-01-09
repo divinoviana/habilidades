@@ -65,7 +65,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
   const generateBimonthlyExam = async (subject: Subject, grade: string) => {
     setGenLoading(true);
     try {
-      // 1. Buscar tópicos enviados pelo professor
+      // 1. Buscar tópicos enviados pelo professor para o bimestre ativo
       const { data: topics } = await supabase
         .from('topics')
         .select('content')
@@ -77,7 +77,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
         .maybeSingle();
 
       if (!topics) {
-        alert(`Nenhum tópico encontrado para ${subject} (${grade} série). Peça para o professor postar os conteúdos primeiro.`);
+        alert(`O professor ainda não determinou os assuntos para o ${settings.activeQuarter}º bimestre na disciplina de ${subject} (${grade} série). A prova oficial não pode ser gerada sem os tópicos.`);
         return;
       }
 
@@ -93,7 +93,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
       }, { onConflict: 'subject,grade,quarter' });
 
       if (error) throw error;
-      alert(`Prova Oficial de ${subject} (${grade} série) gerada com sucesso e liberada para os alunos!`);
+      alert(`Avaliação Oficial de ${subject} (${grade} série) gerada com sucesso para o ${settings.activeQuarter}º bimestre!`);
     } catch (err: any) {
       alert("Erro ao gerar prova: " + err.message);
     } finally {
@@ -164,7 +164,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
                </table>
              </div>
           </div>
-          {/* Form de Professor aqui mantido como no arquivo original */}
         </div>
       )}
 

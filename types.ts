@@ -28,6 +28,33 @@ export interface Question {
   difficulty: 'easy' | 'medium' | 'hard';
 }
 
+export interface ExtraActivity {
+  id: string;
+  teacherId: string;
+  subject: Subject;
+  grade: string;
+  className?: string;
+  theme: string;
+  questions: {
+    question: string;
+    type: 'multiple' | 'open';
+    options?: string[];
+    correctAnswer?: string | number;
+  }[];
+  createdAt: string;
+}
+
+export interface ActivitySubmission {
+  id: string;
+  activityId: string;
+  studentId: string;
+  answers: any[];
+  score: number;
+  feedback: string;
+  createdAt: string;
+  studentName?: string; // Para o professor ver
+}
+
 export interface OfficialExam {
   id: string;
   subject: Subject;
@@ -36,7 +63,6 @@ export interface OfficialExam {
   questions: Question[];
 }
 
-// Added Topic interface to fix import error in TeacherDashboard.tsx
 export interface Topic {
   id: string;
   teacherId: string;
@@ -46,7 +72,6 @@ export interface Topic {
   content: string;
 }
 
-// Added Assessment interface to fix import errors in StudentDashboard.tsx and AssessmentSession.tsx
 export interface Assessment {
   id: string;
   studentId: string;

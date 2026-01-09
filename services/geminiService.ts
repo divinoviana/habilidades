@@ -2,7 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, Subject } from "../types";
 
-// Função auxiliar para instanciar a IA com a chave de ambiente mais recente
 const getAI = () => {
   const apiKey = process.env.API_KEY || (import.meta as any).env?.VITE_API_KEY;
   if (!apiKey) {
@@ -56,9 +55,61 @@ export async function generateEnemAssessment(
   } catch (error: any) {
     console.error("Erro Gemini:", error);
     if (error.status === 429 || error.message?.includes("429")) {
-      throw new Error("Limite de uso da IA atingido. Por favor, aguarde 1 minuto e tente novamente. Se o erro persistir, a cota diária gratuita pode ter acabado.");
+      throw new Error("Limite de uso da IA atingido. Por favor, aguarde 1 minuto e tente novamente.");
     }
     throw new Error("Falha ao gerar conteúdo com IA: " + (error.message || "Erro desconhecido"));
+  }
+}
+
+export async function generateExtraActivity(
+  subject: Subject,
+  theme: string,
+  grade: string
+) {
+  try {
+    const ai = getAI();
+    const prompt = `Crie uma Atividade Extra de ${subject} para a ${grade} série do Ensino Médio sobre o tema: "${theme}".
+    A atividade deve conter 3 questões. As questões podem ser de múltipla escolha ou abertas.
+    Retorne um JSON seguindo este esquema: 
+    [{ "question": "texto", "type": "multiple" | "open", "options": ["A", "B", "C", "D"], "correctAnswer": 0 }]`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    return JSON.parse(response.text);
+  } catch (error: any) {
+    throw new Error("Erro ao gerar atividade extra: " + error.message);
+  }
+}
+
+export async function evaluateActivitySubmission(
+  activity: any,
+  studentAnswers: any[]
+): Promise<{ score: number; feedback: string }> {
+  try {
+    const ai = getAI();
+    const prompt = `Aja como um professor avaliador. Corrija as respostas de um aluno para esta atividade:
+    Atividade: ${JSON.stringify(activity)}
+    Respostas do Aluno: ${JSON.stringify(studentAnswers)}
+    Atribua uma nota de 0 a 10 e forneça um feedback pedagógico curto e direto.
+    Retorne JSON: { "score": 8.5, "feedback": "texto" }`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json"
+      }
+    });
+
+    return JSON.parse(response.text);
+  } catch (error: any) {
+    return { score: 0, feedback: "Erro na correção automática: " + error.message };
   }
 }
 
@@ -71,18 +122,15 @@ export async function generateAIFeedback(
     const ai = getAI();
     const prompt = `Analise o desempenho de um estudante na avaliação de ${subject}.
     Questões e Respostas: ${JSON.stringify(questions.map((q, i) => ({ q: q.text, correct: q.correctIndex, student: answers[i] })))}
-    Forneça um feedback pedagógico incentivador em português, apontando os pontos de melhoria e explicando os conceitos que o aluno errou de forma socrática.`;
+    Forneça um feedback pedagógico incentivador em português.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt
     });
 
-    return response.text || "Não foi possível gerar o feedback automático no momento.";
-  } catch (error: any) {
-    if (error.status === 429) {
-      return "O Tutor de IA está muito ocupado no momento (limite de cota). Mas sua nota foi salva com sucesso!";
-    }
-    return "Feedback indisponível no momento: " + (error.message || "Erro de conexão");
+    return response.text || "Feedback indisponível.";
+  } catch (error) {
+    return "Feedback indisponível no momento.";
   }
 }
