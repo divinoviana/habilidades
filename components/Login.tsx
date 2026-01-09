@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { UserProfile, UserRole } from '../types';
+import { UserProfile, UserRole } from '../types.ts';
 import { LogIn, UserPlus, GraduationCap, Loader2, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase.ts';
 
 interface LoginProps {
   onLogin: (user: UserProfile) => void;
@@ -31,14 +31,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
       if (dbError) throw dbError;
 
       if (!data) {
-        throw new Error('E-mail ou senha incorretos. Verifique os dados ou o cadastro.');
+        throw new Error('E-mail ou senha incorretos. Verifique se o SQL do banco foi executado.');
       }
 
       if (data.cheating_locked) {
-        throw new Error('Seu acesso está bloqueado por excesso de tentativas de cola. Procure a administração.');
+        throw new Error('Seu acesso está bloqueado por excesso de tentativas de cola.');
       }
 
-      // Mapeamento manual de snake_case para camelCase para o UserProfile
       const user: UserProfile = {
         id: data.id,
         email: data.email,
@@ -68,12 +67,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
               <GraduationCap size={40} className="text-white" />
             </div>
           </div>
-          
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-slate-800">Escola Federico</h2>
             <p className="text-slate-500 text-sm font-medium uppercase tracking-wider">Sistema de Avaliação Inteligente</p>
           </div>
-
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">E-mail de Acesso</label>
@@ -86,7 +83,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
                 required
               />
             </div>
-            
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Sua Senha</label>
               <input 
@@ -98,14 +94,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
                 required
               />
             </div>
-
             {error && (
               <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-sm font-medium flex gap-3 animate-in fade-in slide-in-from-top-2">
                 <AlertCircle size={20} className="shrink-0" />
                 {error}
               </div>
             )}
-
             <button 
               type="submit"
               disabled={loading}
@@ -115,7 +109,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
               Acessar Painel
             </button>
           </form>
-
           <div className="mt-8 pt-8 border-t border-slate-100 text-center">
             <button 
               onClick={onGoToRegister}
@@ -124,10 +117,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
               <UserPlus size={18} /> Novo por aqui? Criar Cadastro
             </button>
           </div>
-        </div>
-        
-        <div className="bg-slate-50 p-4 text-center border-t border-slate-100">
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">SEDUC - Estado do Tocantins</p>
         </div>
       </div>
     </div>

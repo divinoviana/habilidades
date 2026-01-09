@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserRole, UserProfile, GlobalSettings } from './types';
-import Login from './components/Login';
-import Register from './components/Register';
-import AdminDashboard from './components/AdminDashboard';
-import TeacherDashboard from './components/TeacherDashboard';
-import StudentDashboard from './components/StudentDashboard';
+import { UserRole, UserProfile, GlobalSettings } from './types.ts';
+import Login from './components/Login.tsx';
+import Register from './components/Register.tsx';
+import AdminDashboard from './components/AdminDashboard.tsx';
+import TeacherDashboard from './components/TeacherDashboard.tsx';
+import StudentDashboard from './components/StudentDashboard.tsx';
 import { LogOut, GraduationCap } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -16,11 +16,6 @@ const App: React.FC = () => {
     isAssessmentLocked: { 1: false, 2: true, 3: true, 4: true },
     releaseDates: { 1: '2024-03-20', 2: '2024-06-15', 3: '2024-09-10', 4: '2024-11-25' }
   });
-
-  // Mock initial users for testing (Admin login: divinoviana@gmail.com / 3614526312)
-  useEffect(() => {
-    // Persistent mock data or initial load logic could go here
-  }, []);
 
   const handleLogout = () => {
     setCurrentUser(null);
