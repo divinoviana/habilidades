@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, GlobalSettings, UserRole, Subject, Topic } from '../types';
-import { Users, Lock, Unlock, Calendar, Trash2, ShieldAlert, KeyRound, Loader2, RefreshCw, Sparkles, Wand2, ChevronLeft, AlertCircle, BookOpen, Clock, Database, Copy } from 'lucide-react';
+import { Users, Lock, Unlock, Calendar, Trash2, ShieldAlert, KeyRound, Loader2, RefreshCw, Sparkles, Wand2, ChevronLeft, AlertCircle, BookOpen, Clock, Database, Copy, Search, UserCheck, UserMinus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateEnemAssessment } from '../services/geminiService';
 
@@ -14,6 +14,7 @@ interface AdminDashboardProps {
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, setSettings }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'assessments' | 'topics' | 'official_exams' | 'sql_help'>('users');
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [allTopics, setAllTopics] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [genLoading, setGenLoading] = useState<string | null>(null);
@@ -40,6 +41,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
       })));
     }
     setLoading(false);
+  };
+
+  const toggleUserLock = async (userId: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ cheating_locked: !currentStatus })
+      .eq('id', userId);
+    
+    if (!error) {
+      alert(currentStatus ? "Usuário desbloqueado com sucesso!" : "Usuário bloqueado!");
+      fetchUsers();
+    }
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!confirm("TEM CERTEZA? Isso excluirá permanentemente este usuário e todos os seus registros de provas.")) return;
+    const { error } = await supabase.from('profiles').delete().eq('id', userId);
+    if (!error) {
+      alert("Usuário removido.");
+      fetchUsers();
+    } else {
+      alert("Erro ao excluir: " + error.message);
+    }
   };
 
   const fetchAllTopics = async () => {
@@ -126,7 +150,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
     }
   };
 
-  const SQL_CODE = `-- 1. Tabela de Provas Oficiais
+  const filteredUsers = usersList.filter(u => 
+    u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const SQL_CODE = `-- CÓDIGO DE REPARAÇÃO DO BANCO
 CREATE TABLE IF NOT EXISTS official_exams (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     subject TEXT NOT NULL,
@@ -137,7 +166,6 @@ CREATE TABLE IF NOT EXISTS official_exams (
     UNIQUE(subject, grade, quarter)
 );
 
--- 2. Tabela de Configurações Globais
 CREATE TABLE IF NOT EXISTS global_settings (
     id INTEGER PRIMARY KEY DEFAULT 1,
     active_quarter INTEGER DEFAULT 1,
@@ -145,19 +173,17 @@ CREATE TABLE IF NOT EXISTS global_settings (
     release_dates JSONB DEFAULT '{"1": "", "2": "", "3": "", "4": ""}'
 );
 
--- 3. Tabela de Atividades Extras
 CREATE TABLE IF NOT EXISTS extra_activities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     teacher_id UUID REFERENCES profiles(id),
     subject TEXT NOT NULL,
     grade TEXT NOT NULL,
-    class_name TEXT, -- Null significa todas as turmas
+    class_name TEXT,
     theme TEXT NOT NULL,
     questions JSONB NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. Tabela de Submissões de Atividades
 CREATE TABLE IF NOT EXISTS activity_submissions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     activity_id UUID REFERENCES extra_activities(id) ON DELETE CASCADE,
@@ -176,69 +202,190 @@ ALTER TABLE activity_submissions DISABLE ROW LEVEL SECURITY;`;
   return (
     <div className="space-y-6">
       <div className="flex gap-2 overflow-x-auto pb-2 no-print">
-        <button onClick={() => setActiveTab('users')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'users' ? 'bg-blue-600 text-white' : 'bg-white border'}`}><Users size={18}/> Usuários</button>
-        <button onClick={() => setActiveTab('topics')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'topics' ? 'bg-blue-600 text-white' : 'bg-white border'}`}><BookOpen size={18}/> Planejamentos</button>
-        <button onClick={() => setActiveTab('assessments')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'assessments' ? 'bg-blue-600 text-white' : 'bg-white border'}`}><Calendar size={18}/> Calendário</button>
-        <button onClick={() => setActiveTab('official_exams')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'official_exams' ? 'bg-blue-600 text-white' : 'bg-white border'}`}><Sparkles size={18}/> Gerar Provas</button>
-        <button onClick={() => setActiveTab('sql_help')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'sql_help' ? 'bg-amber-600 text-white' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}><Database size={18}/> Ajuda SQL</button>
+        <button onClick={() => setActiveTab('users')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'users' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Users size={18}/> Usuários</button>
+        <button onClick={() => setActiveTab('topics')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'topics' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><BookOpen size={18}/> Planejamentos</button>
+        <button onClick={() => setActiveTab('assessments')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'assessments' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Calendar size={18}/> Calendário</button>
+        <button onClick={() => setActiveTab('official_exams')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'official_exams' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Sparkles size={18}/> Gerar Provas</button>
+        <button onClick={() => setActiveTab('sql_help')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'sql_help' ? 'bg-amber-600 text-white shadow-lg' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}><Database size={18}/> Ajuda SQL</button>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        {activeTab === 'users' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b pb-6">
+              <div>
+                <h3 className="text-2xl font-black text-slate-800">Gestão de Usuários</h3>
+                <p className="text-slate-500 text-sm">Controle de acesso para alunos, professores e administradores.</p>
+              </div>
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+                <input 
+                  type="text" 
+                  placeholder="Buscar por nome ou e-mail..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <button onClick={fetchUsers} className="p-3 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all">
+                <RefreshCw size={20} className={loading ? 'animate-spin text-blue-600' : 'text-slate-600'}/>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredUsers.map(u => (
+                <div key={u.id} className={`p-6 border rounded-[32px] bg-white transition-all hover:shadow-xl group relative overflow-hidden ${u.cheatingLocked ? 'border-red-200 bg-red-50/30' : 'border-slate-100'}`}>
+                  {u.cheatingLocked && (
+                    <div className="absolute top-0 right-0 bg-red-600 text-white px-4 py-1 text-[10px] font-black uppercase tracking-widest rounded-bl-xl">
+                      Bloqueado por Cola
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-16 h-16 rounded-2xl overflow-hidden bg-slate-100 border-2 border-slate-50 shrink-0">
+                      {u.avatarUrl ? (
+                        <img src={u.avatarUrl} className="w-full h-full object-cover" alt={u.fullName}/>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-300"><Users size={24}/></div>
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-800 line-clamp-1">{u.fullName}</h4>
+                      <p className="text-xs text-slate-400 font-medium">{u.email}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                      u.role === 'admin' ? 'bg-amber-100 text-amber-700' :
+                      u.role === 'teacher' ? 'bg-blue-100 text-blue-700' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>
+                      {u.role}
+                    </span>
+                    {u.role === 'student' && (
+                      <>
+                        <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">
+                          {u.grade} Série
+                        </span>
+                        <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest">
+                          Turma {u.className}
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2">
+                    {u.cheatingLocked ? (
+                      <button 
+                        onClick={() => toggleUserLock(u.id, true)}
+                        className="flex-1 bg-green-600 text-white py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-green-700 transition-all"
+                      >
+                        <Unlock size={14}/> Desbloquear
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={() => toggleUserLock(u.id, false)}
+                        className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-red-50 hover:text-red-600 transition-all"
+                      >
+                        <Lock size={14}/> Bloquear
+                      </button>
+                    )}
+                    <button 
+                      onClick={() => deleteUser(u.id)}
+                      className="p-3 bg-slate-100 text-slate-400 rounded-2xl hover:bg-red-500 hover:text-white transition-all"
+                    >
+                      <Trash2 size={18}/>
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {filteredUsers.length === 0 && !loading && (
+                <div className="col-span-full py-20 text-center">
+                  <Users size={48} className="mx-auto text-slate-200 mb-4"/>
+                  <p className="text-slate-400 font-medium italic">Nenhum usuário encontrado com este critério.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'sql_help' && (
           <div className="space-y-6 animate-fade-in">
             <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl flex gap-4 text-amber-800">
               <AlertCircle size={32} />
               <div>
-                <h3 className="font-bold">Correção Completa do Banco</h3>
-                <p className="text-xs">Copie e cole o código abaixo no SQL Editor do Supabase para habilitar Atividades Extras e as novas tabelas.</p>
+                <h3 className="font-bold text-lg">Central de Reparação de Tabelas</h3>
+                <p className="text-sm">Se alguma funcionalidade de provas ou atividades estiver falhando, execute o script abaixo no Supabase SQL Editor.</p>
               </div>
             </div>
             <div className="relative">
-               <pre className="bg-slate-900 text-slate-100 p-6 rounded-2xl overflow-x-auto text-xs font-mono">{SQL_CODE}</pre>
-               <button onClick={() => { navigator.clipboard.writeText(SQL_CODE); alert("Copiado!"); }} className="absolute top-4 right-4 bg-white/10 p-2 rounded-lg text-white text-[10px]"><Copy size={14}/> COPIAR SQL</button>
+               <pre className="bg-slate-900 text-slate-100 p-6 rounded-2xl overflow-x-auto text-xs font-mono leading-relaxed">{SQL_CODE}</pre>
+               <button onClick={() => { navigator.clipboard.writeText(SQL_CODE); alert("Script SQL Copiado!"); }} className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 p-2 rounded-lg text-white text-[10px] flex items-center gap-2 transition-all">
+                 <Copy size={14}/> COPIAR SQL
+               </button>
             </div>
           </div>
         )}
 
         {activeTab === 'topics' && (
-          <div className="space-y-6">
-            <h3 className="font-bold text-slate-800 text-2xl">Planejamentos Recebidos</h3>
+          <div className="space-y-6 animate-fade-in">
+            <h3 className="font-black text-slate-800 text-2xl tracking-tighter">Planejamentos Recebidos</h3>
             <div className="grid grid-cols-1 gap-4">
               {allTopics.map((t) => (
-                <div key={t.id} className="p-5 border rounded-3xl bg-slate-50 flex justify-between items-start">
+                <div key={t.id} className="p-6 border border-slate-100 rounded-[32px] bg-slate-50/50 flex justify-between items-start hover:shadow-md transition-all">
                   <div className="flex-1">
-                    <div className="flex gap-2 mb-2">
-                      <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-1 rounded">{t.subject}</span>
-                      <span className="text-[10px] font-black bg-slate-200 text-slate-600 px-2 py-1 rounded">{t.grade} SÉRIE</span>
+                    <div className="flex gap-2 mb-3">
+                      <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase tracking-widest">{t.subject}</span>
+                      <span className="text-[10px] font-black bg-white border border-slate-200 text-slate-500 px-3 py-1 rounded-full uppercase tracking-widest">{t.grade} SÉRIE</span>
                     </div>
-                    <p className="font-bold text-slate-700">Prof. {t.profiles?.full_name}</p>
-                    <p className="text-slate-500 text-sm italic">"{t.content}"</p>
+                    <p className="font-bold text-slate-800 mb-1">Prof. {t.profiles?.full_name}</p>
+                    <p className="text-slate-600 text-sm leading-relaxed italic">"{t.content}"</p>
+                    <div className="mt-3 flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase">
+                      <Clock size={12}/> Enviado em {new Date(t.created_at).toLocaleDateString()}
+                    </div>
                   </div>
-                  <button onClick={() => handleDeleteTopic(t.id)} className="text-red-400 p-2"><Trash2 size={18}/></button>
+                  <button onClick={() => handleDeleteTopic(t.id)} className="text-slate-300 hover:text-red-500 p-3 transition-colors">
+                    <Trash2 size={20}/>
+                  </button>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Mantido Calendário e Gerador de Provas como antes... */}
         {activeTab === 'assessments' && (
-          <div className="space-y-8 max-w-2xl mx-auto">
+          <div className="space-y-8 max-w-2xl mx-auto animate-fade-in">
             <div className="text-center">
-              <h3 className="text-3xl font-black text-slate-800">Controle de Bimestres</h3>
+              <h3 className="text-3xl font-black text-slate-800 tracking-tighter">Controle de Bimestres</h3>
+              <p className="text-slate-500 mt-2">Ative o período letivo e defina as datas das provas oficiais.</p>
             </div>
-            <div className="p-8 bg-slate-50 rounded-[40px] border space-y-8">
-              <div className="grid grid-cols-4 gap-2">
+            <div className="p-8 bg-slate-50 border-2 border-slate-100 rounded-[40px] space-y-8 shadow-inner">
+              <div className="grid grid-cols-4 gap-3">
                 {[1, 2, 3, 4].map(q => (
-                  <button key={q} onClick={() => updateGlobalSettings({ activeQuarter: q })} className={`py-4 rounded-2xl font-black border-2 ${settings.activeQuarter === q ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white text-slate-400'}`}>{q}º</button>
+                  <button key={q} onClick={() => updateGlobalSettings({ activeQuarter: q })} className={`py-5 rounded-[24px] font-black border-2 transition-all ${settings.activeQuarter === q ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-200 scale-105' : 'bg-white border-white text-slate-300 hover:border-slate-200'}`}>{q}º Bim</button>
                 ))}
               </div>
               <div className="space-y-4">
                 {[1, 2, 3, 4].map(q => (
-                  <div key={q} className="p-5 bg-white border rounded-3xl flex justify-between items-center">
-                    <p className="font-bold text-slate-700">{q}º Bimestre</p>
-                    <input type="date" className="text-xs bg-slate-50 p-2 rounded-xl border-none" value={settings.releaseDates[q] || ''} onChange={(e) => updateGlobalSettings({ releaseDates: { ...settings.releaseDates, [q]: e.target.value } })} />
-                    <button onClick={() => updateGlobalSettings({ isAssessmentLocked: { ...settings.isAssessmentLocked, [q]: !settings.isAssessmentLocked[q] } })} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase ${settings.isAssessmentLocked[q] ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{settings.isAssessmentLocked[q] ? 'Bloqueado' : 'Aberto'}</button>
+                  <div key={q} className={`p-5 bg-white border rounded-[32px] flex flex-col md:flex-row justify-between items-center gap-4 transition-all ${settings.activeQuarter === q ? 'ring-2 ring-blue-500 shadow-lg' : 'opacity-60 grayscale'}`}>
+                    <div className="flex-1 text-center md:text-left">
+                      <p className="font-black text-slate-800 text-lg uppercase tracking-widest">{q}º Bimestre</p>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase">Status de Aplicação</p>
+                    </div>
+                    <input 
+                      type="date" 
+                      className="text-sm bg-slate-50 p-3 rounded-2xl border-none font-bold text-slate-600 outline-none" 
+                      value={settings.releaseDates[q] || ''} 
+                      onChange={(e) => updateGlobalSettings({ releaseDates: { ...settings.releaseDates, [q]: e.target.value } })} 
+                    />
+                    <button 
+                      onClick={() => updateGlobalSettings({ isAssessmentLocked: { ...settings.isAssessmentLocked, [q]: !settings.isAssessmentLocked[q] } })} 
+                      className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all ${settings.isAssessmentLocked[q] ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}
+                    >
+                      {settings.isAssessmentLocked[q] ? <Lock size={14}/> : <Unlock size={14}/>}
+                      {settings.isAssessmentLocked[q] ? 'Bloqueado' : 'Aberto'}
+                    </button>
                   </div>
                 ))}
               </div>
@@ -247,19 +394,31 @@ ALTER TABLE activity_submissions DISABLE ROW LEVEL SECURITY;`;
         )}
 
         {activeTab === 'official_exams' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {['História', 'Filosofia', 'Geografia', 'Sociologia'].map(subj => (
-              <div key={subj} className="p-6 border rounded-3xl bg-slate-50 space-y-4">
-                <h4 className="font-black uppercase text-slate-400 text-[10px] tracking-widest">{subj}</h4>
-                <div className="space-y-2">
-                  {['1ª', '2ª', '3ª'].map(grade => (
-                    <button key={grade} onClick={() => generateBimonthlyExam(subj as Subject, grade)} disabled={!!genLoading} className="w-full flex justify-between items-center p-4 bg-white border rounded-2xl font-bold text-sm">
-                      {grade} Série {genLoading === `${subj}-${grade}` ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16}/>}
-                    </button>
-                  ))}
+          <div className="animate-fade-in space-y-8">
+            <div className="text-center mb-8">
+              <h3 className="text-3xl font-black text-slate-800 tracking-tighter">Gerador de Provas Oficiais</h3>
+              <p className="text-slate-500">Selecione a disciplina e a série para a IA gerar a avaliação baseada no planejamento do professor.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {['História', 'Filosofia', 'Geografia', 'Sociologia'].map(subj => (
+                <div key={subj} className="p-8 border-2 border-slate-50 rounded-[40px] bg-slate-50/50 space-y-6">
+                  <h4 className="font-black uppercase text-slate-400 text-[11px] tracking-[0.2em] border-b pb-4">{subj}</h4>
+                  <div className="space-y-3">
+                    {['1ª', '2ª', '3ª'].map(grade => (
+                      <button 
+                        key={grade} 
+                        onClick={() => generateBimonthlyExam(subj as Subject, grade)} 
+                        disabled={!!genLoading} 
+                        className="w-full flex justify-between items-center p-5 bg-white border border-slate-100 rounded-3xl font-black text-sm hover:border-blue-500 hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 group"
+                      >
+                        {grade} Série 
+                        {genLoading === `${subj}-${grade}` ? <Loader2 size={18} className="animate-spin text-blue-600"/> : <Sparkles size={18} className="text-slate-200 group-hover:text-blue-500 transition-colors"/>}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </div>
