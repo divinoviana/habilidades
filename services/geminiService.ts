@@ -76,8 +76,8 @@ export async function generateExtraActivity(
     const prompt = `Crie uma Atividade Extra de ${subject} (${grade} série) sobre o tema: "${theme}".
     
     REQUISITOS:
-    1. Gere exatamente 10 questões variadas (múltipla escolha e abertas).
-    2. Use citações (citation) e descrições de imagens (visualDescription) em pelo menos metade das questões.
+    1. Gere exatamente 5 questões variadas (múltipla escolha e abertas).
+    2. Use citações (citation) e descrições de imagens (visualDescription) em pelo menos 2 questões.
     3. Nível de linguagem adequado para o Ensino Médio.
     
     FORMATO JSON:
