@@ -26,6 +26,8 @@ export interface Question {
   correctIndex: number;
   explanation: string;
   difficulty: 'easy' | 'medium' | 'hard';
+  citation?: string; // Texto base ou citação
+  visualDescription?: string; // Descrição de gráfico, mapa ou charge
 }
 
 export interface ExtraActivity {
@@ -36,10 +38,13 @@ export interface ExtraActivity {
   className?: string;
   theme: string;
   questions: {
+    id: string;
     question: string;
     type: 'multiple' | 'open';
     options?: string[];
     correctAnswer?: string | number;
+    citation?: string;
+    visualDescription?: string;
   }[];
   createdAt: string;
 }
@@ -52,7 +57,7 @@ export interface ActivitySubmission {
   score: number;
   feedback: string;
   createdAt: string;
-  studentName?: string; // Para o professor ver
+  studentName?: string;
 }
 
 export interface OfficialExam {

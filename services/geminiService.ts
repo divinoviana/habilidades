@@ -2,7 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, Subject } from "../types";
 
-// Always use process.env.API_KEY directly as it is assumed to be pre-configured.
 const getAI = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 };
@@ -14,13 +13,28 @@ export async function generateEnemAssessment(
 ): Promise<Question[]> {
   try {
     const ai = getAI();
-    const prompt = `Gere uma avaliação no padrão ENEM para a disciplina de ${subject} para a ${grade} série do Ensino Médio.
-    Os tópicos trabalhados foram: ${topics}.
-    Gere exatamente 5 questões de múltipla escolha.
-    Cada questão deve ter um texto base ou contexto, comando da questão, 5 opções (A-E) e uma explicação detalhada.
-    Retorne um array de objetos JSON.`;
+    const prompt = `Aja como um especialista em elaboração de itens do ENEM para a área de Ciências Humanas.
+    Gere uma avaliação oficial para ${subject} (${grade} série) focada em: "${topics}".
+    
+    REQUISITOS OBRIGATÓRIOS:
+    1. Gere exatamente 10 questões de múltipla escolha.
+    2. Cada questão deve possuir um "citation" (Texto-base: fragmento de livro, documento histórico, citação filosófica ou artigo científico).
+    3. Pelo menos 3 questões devem incluir um "visualDescription" (Descrição detalhada de um mapa, gráfico, infográfico ou charge para o aluno analisar).
+    4. O comando da questão deve exigir análise crítica do texto-base fornecido.
+    5. Distribua as dificuldades entre easy, medium e hard.
 
-    // Using gemini-3-pro-preview for complex reasoning task (standardized exam generation)
+    RETORNE UM ARRAY JSON DE OBJETOS:
+    {
+      "id": "string única",
+      "citation": "texto ou citação",
+      "visualDescription": "descrição do elemento visual ou null",
+      "text": "comando da questão",
+      "options": ["A", "B", "C", "D", "E"],
+      "correctIndex": número de 0 a 4,
+      "explanation": "justificativa pedagógica",
+      "difficulty": "easy" | "medium" | "hard"
+    }`;
+
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: prompt,
@@ -32,22 +46,20 @@ export async function generateEnemAssessment(
             type: Type.OBJECT,
             properties: {
               id: { type: Type.STRING },
+              citation: { type: Type.STRING },
+              visualDescription: { type: Type.STRING, nullable: true },
               text: { type: Type.STRING },
-              options: { 
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-              },
+              options: { type: Type.ARRAY, items: { type: Type.STRING } },
               correctIndex: { type: Type.INTEGER },
               explanation: { type: Type.STRING },
               difficulty: { type: Type.STRING }
             },
-            required: ["id", "text", "options", "correctIndex", "explanation", "difficulty"]
+            required: ["id", "citation", "text", "options", "correctIndex", "explanation", "difficulty"]
           }
         }
       }
     });
 
-    // Access .text property directly
     return JSON.parse(response.text || "[]");
   } catch (error: any) {
     throw new Error("Falha ao gerar prova com IA: " + error.message);
@@ -61,12 +73,24 @@ export async function generateExtraActivity(
 ) {
   try {
     const ai = getAI();
-    const prompt = `Crie uma Atividade de ${subject} para a ${grade} série sobre: "${theme}".
-    Retorne exatamente 3 questões. Algumas de múltipla escolha e pelo menos uma aberta.
-    FORMATO JSON OBRIGATÓRIO:
-    [{ "question": "texto da pergunta", "type": "multiple" | "open", "options": ["A", "B", "C", "D"], "correctAnswer": 0 }]`;
+    const prompt = `Crie uma Atividade Extra de ${subject} (${grade} série) sobre o tema: "${theme}".
+    
+    REQUISITOS:
+    1. Gere 6 questões variadas (múltipla escolha e abertas).
+    2. Use citações (citation) e descrições de imagens (visualDescription) em pelo menos metade das questões.
+    3. Nível de linguagem adequado para o Ensino Médio.
+    
+    FORMATO JSON:
+    [{ 
+      "id": "u1",
+      "citation": "texto base",
+      "visualDescription": "descrição visual opcional",
+      "question": "texto da pergunta", 
+      "type": "multiple" | "open", 
+      "options": ["A", "B", "C", "D"], 
+      "correctAnswer": 0 
+    }]`;
 
-    // Using gemini-3-pro-preview for generating high-quality educational content
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: prompt,
@@ -75,7 +99,6 @@ export async function generateExtraActivity(
       }
     });
 
-    // Access .text property directly
     return JSON.parse(response.text || "[]");
   } catch (error: any) {
     throw new Error("Erro Gemini: " + error.message);
@@ -89,9 +112,8 @@ export async function evaluateActivitySubmission(
   try {
     const ai = getAI();
     const prompt = `Aja como professor. Atividade: ${JSON.stringify(activity)}. Respostas: ${JSON.stringify(studentAnswers)}. 
-    Dê nota 0-10 e feedback. Retorne JSON: { "score": 8, "feedback": "texto" }`;
+    Dê nota 0-10 e feedback detalhado. Retorne JSON: { "score": 8, "feedback": "texto" }`;
 
-    // Using gemini-3-pro-preview for complex evaluation and pedagogical scoring
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: prompt,
@@ -100,7 +122,6 @@ export async function evaluateActivitySubmission(
       }
     });
 
-    // Access .text property directly
     return JSON.parse(response.text || '{"score":0,"feedback":"Erro"}');
   } catch (error: any) {
     return { score: 0, feedback: "Falha na correção: " + error.message };
@@ -114,13 +135,12 @@ export async function generateAIFeedback(
 ): Promise<string> {
   try {
     const ai = getAI();
-    const prompt = `Dê um feedback pedagógico incentivador para o aluno em ${subject}. Resultados: ${JSON.stringify(answers)}.`;
-    // Using gemini-3-pro-preview for nuanced and high-quality educational feedback
+    const prompt = `Analise o desempenho do aluno em ${subject}. Questões: ${JSON.stringify(questions)}. Respostas: ${JSON.stringify(answers)}. 
+    Gere um feedback pedagógico incentivador, apontando pontos fortes e o que revisar.`;
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: prompt
     });
-    // Access .text property directly
     return response.text || "Feedback indisponível.";
   } catch (error) {
     return "Feedback indisponível.";
