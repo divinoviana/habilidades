@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, GlobalSettings, UserRole, Subject, Topic } from '../types';
-import { Users, Lock, Unlock, Calendar, Trash2, ShieldAlert, KeyRound, Loader2, RefreshCw, Sparkles, Wand2, ChevronLeft, AlertCircle, BookOpen, Clock, Database, Copy, Search, UserCheck, UserMinus } from 'lucide-react';
+import { Users, Lock, Unlock, Calendar, Trash2, ShieldAlert, KeyRound, Loader2, RefreshCw, Sparkles, Wand2, ChevronLeft, AlertCircle, BookOpen, Clock, Database, Copy, Search, UserCheck, UserMinus, UserPlus, X, Mail, Shield } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateEnemAssessment } from '../services/geminiService';
 
@@ -11,6 +11,12 @@ interface AdminDashboardProps {
   setSettings: (s: GlobalSettings) => void;
 }
 
+const CLASSES_MAP: { [key: string]: string[] } = {
+  "1ª": ["13.01", "13.02", "13.03", "13.04", "13.05", "13.06"],
+  "2ª": ["23.01", "23.02", "23.03", "23.04", "23.05", "23.06", "23.07", "23.08"],
+  "3ª": ["33.01", "33.02", "33.03", "33.04", "33.05", "33.06", "33.07", "33.08"]
+};
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, setSettings }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'assessments' | 'topics' | 'official_exams' | 'sql_help'>('users');
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
@@ -18,6 +24,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
   const [allTopics, setAllTopics] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [genLoading, setGenLoading] = useState<string | null>(null);
+
+  // States para novo usuário
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    role: 'teacher' as UserRole,
+    grade: '1ª',
+    className: '13.01'
+  });
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -41,6 +59,39 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
       })));
     }
     setLoading(false);
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreatingUser(true);
+    try {
+      const { error } = await supabase.from('profiles').insert([{
+        full_name: newUserForm.fullName,
+        email: newUserForm.email,
+        password: newUserForm.password,
+        role: newUserForm.role,
+        grade: newUserForm.role === 'student' ? newUserForm.grade : null,
+        class_name: newUserForm.role === 'student' ? newUserForm.className : null
+      }]);
+
+      if (error) throw error;
+
+      alert("Usuário cadastrado com sucesso!");
+      setIsAddUserModalOpen(false);
+      setNewUserForm({
+        fullName: '',
+        email: '',
+        password: '',
+        role: 'teacher',
+        grade: '1ª',
+        className: '13.01'
+      });
+      fetchUsers();
+    } catch (err: any) {
+      alert("Erro ao criar usuário: " + err.message);
+    } finally {
+      setIsCreatingUser(false);
+    }
   };
 
   const toggleUserLock = async (userId: string, currentStatus: boolean) => {
@@ -226,19 +277,24 @@ ALTER TABLE student_observations DISABLE ROW LEVEL SECURITY;`;
                 <h3 className="text-2xl font-black text-slate-800">Gestão de Usuários</h3>
                 <p className="text-slate-500 text-sm">Controle de acesso para alunos, professores e administradores.</p>
               </div>
-              <div className="relative w-full md:w-80">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-                <input 
-                  type="text" 
-                  placeholder="Buscar por nome ou e-mail..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
-                />
+              <div className="flex flex-1 justify-end gap-3 w-full md:w-auto">
+                <div className="relative flex-1 md:max-w-xs">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+                  <input 
+                    type="text" 
+                    placeholder="Buscar..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <button onClick={() => setIsAddUserModalOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100">
+                  <UserPlus size={20}/> <span className="hidden sm:inline">Novo Usuário</span>
+                </button>
+                <button onClick={fetchUsers} className="p-3 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all">
+                  <RefreshCw size={20} className={loading ? 'animate-spin text-blue-600' : 'text-slate-600'}/>
+                </button>
               </div>
-              <button onClick={fetchUsers} className="p-3 bg-slate-100 rounded-xl hover:bg-slate-200 transition-all">
-                <RefreshCw size={20} className={loading ? 'animate-spin text-blue-600' : 'text-slate-600'}/>
-              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -270,7 +326,7 @@ ALTER TABLE student_observations DISABLE ROW LEVEL SECURITY;`;
                       u.role === 'teacher' ? 'bg-blue-100 text-blue-700' :
                       'bg-slate-100 text-slate-600'
                     }`}>
-                      {u.role}
+                      {u.role === 'admin' ? 'Administrador' : u.role === 'teacher' ? 'Professor' : 'Estudante'}
                     </span>
                     {u.role === 'student' && (
                       <>
@@ -315,6 +371,120 @@ ALTER TABLE student_observations DISABLE ROW LEVEL SECURITY;`;
                   <p className="text-slate-400 font-medium italic">Nenhum usuário encontrado com este critério.</p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Modal para adicionar novo usuário */}
+        {isAddUserModalOpen && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="p-8 bg-blue-600 text-white flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <UserPlus size={24}/>
+                  <h3 className="text-xl font-black uppercase tracking-tighter">Cadastrar Novo Usuário</h3>
+                </div>
+                <button onClick={() => setIsAddUserModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={24}/></button>
+              </div>
+
+              <form onSubmit={handleCreateUser} className="p-8 space-y-5">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 ml-1">Nome Completo</label>
+                  <div className="relative">
+                    <UserCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
+                    <input 
+                      required
+                      type="text" 
+                      className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+                      value={newUserForm.fullName}
+                      onChange={(e) => setNewUserForm({...newUserForm, fullName: e.target.value})}
+                      placeholder="Ex: João da Silva"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 ml-1">E-mail de Acesso</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
+                    <input 
+                      required
+                      type="email" 
+                      className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+                      value={newUserForm.email}
+                      onChange={(e) => setNewUserForm({...newUserForm, email: e.target.value})}
+                      placeholder="professor@escola.com"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 ml-1">Senha Inicial</label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
+                    <input 
+                      required
+                      type="password" 
+                      className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
+                      value={newUserForm.password}
+                      onChange={(e) => setNewUserForm({...newUserForm, password: e.target.value})}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 ml-1">Cargo / Permissão</label>
+                  <div className="relative">
+                    <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
+                    <select 
+                      className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold appearance-none"
+                      value={newUserForm.role}
+                      onChange={(e) => setNewUserForm({...newUserForm, role: e.target.value as UserRole})}
+                    >
+                      <option value="teacher">Professor</option>
+                      <option value="admin">Administrador</option>
+                      <option value="student">Estudante</option>
+                    </select>
+                  </div>
+                </div>
+
+                {newUserForm.role === 'student' && (
+                  <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 ml-1">Série</label>
+                      <select 
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                        value={newUserForm.grade}
+                        onChange={(e) => setNewUserForm({...newUserForm, grade: e.target.value, className: CLASSES_MAP[e.target.value][0]})}
+                      >
+                        <option>1ª</option>
+                        <option>2ª</option>
+                        <option>3ª</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 ml-1">Turma</label>
+                      <select 
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold"
+                        value={newUserForm.className}
+                        onChange={(e) => setNewUserForm({...newUserForm, className: e.target.value})}
+                      >
+                        {CLASSES_MAP[newUserForm.grade].map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                <button 
+                  type="submit"
+                  disabled={isCreatingUser}
+                  className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl shadow-xl flex items-center justify-center gap-2 hover:bg-slate-800 disabled:opacity-50 transition-all active:scale-95"
+                >
+                  {isCreatingUser ? <Loader2 className="animate-spin" size={20}/> : <UserPlus size={20}/>}
+                  Finalizar Cadastro
+                </button>
+              </form>
             </div>
           </div>
         )}
