@@ -218,7 +218,7 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
               <div key={subj} className="p-8 border rounded-[40px] bg-slate-50/50 space-y-4">
                 <h4 className="font-black text-slate-400 text-xs uppercase tracking-widest">{subj}</h4>
                 {['1ª', '2ª', '3ª'].map(grade => (
-                  <button key={grade} onClick={() => generateBimonthlyExam(subj as Subject, grade)} disabled={!!genLoading} className="w-full flex justify-between items-center p-4 bg-white border rounded-3xl font-bold text-sm hover:border-blue-500">
+                  <button key={grade} onClick={() => generateBimonthlyExam(subj as Subject, grade)} disabled={!!genLoading} className="w-full flex justify-between items-center p-4 bg-white border rounded-3xl font-bold text-sm hover:border-blue-500 transition-all shadow-sm">
                     {grade} Série {genLoading === `${subj}-${grade}` ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16} className="text-blue-500"/>}
                   </button>
                 ))}
@@ -230,8 +230,8 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
         {activeTab === 'sql_help' && (
           <div className="space-y-6">
             <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl text-amber-800"><p className="font-bold">Script de Criação/Reparação</p><p className="text-sm">Copie e execute no menu SQL Editor do Supabase.</p></div>
-            <pre className="bg-slate-900 text-slate-100 p-6 rounded-2xl overflow-x-auto text-xs font-mono">{SQL_CODE}</pre>
-            <button onClick={() => { navigator.clipboard.writeText(SQL_CODE); alert("Copiado!"); }} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black flex justify-center items-center gap-2"><Copy size={18}/> COPIAR SCRIPT</button>
+            <pre className="bg-slate-900 text-slate-100 p-6 rounded-2xl overflow-x-auto text-xs font-mono leading-relaxed">{SQL_CODE}</pre>
+            <button onClick={() => { navigator.clipboard.writeText(SQL_CODE); alert("Copiado com sucesso!"); }} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black flex justify-center items-center gap-2 hover:bg-slate-700 transition-all"><Copy size={18}/> COPIAR SCRIPT</button>
           </div>
         )}
       </div>
