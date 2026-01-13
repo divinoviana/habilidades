@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { UserProfile, GlobalSettings, Subject, Assessment, Question, ExtraActivity } from '../types';
-import { Sparkles, History, Loader2, FileCheck, ClipboardList, Send, CheckCircle2, User, Camera, Upload, ChevronLeft, RefreshCw, BookOpen, AlertCircle } from 'lucide-react';
+import { Sparkles, History, Loader2, FileCheck, ClipboardList, Send, CheckCircle2, User, Camera, Upload, ChevronLeft, RefreshCw, BookOpen, AlertCircle, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import AssessmentSession from './AssessmentSession';
 import { generateEnemAssessment, evaluateActivitySubmission } from '../services/geminiService';
@@ -15,6 +15,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
   const [session, setSession] = useState<{ active: boolean; subject?: Subject; isMock: boolean }>({ active: false, isMock: false });
   const [extraSession, setExtraSession] = useState<ExtraActivity | null>(null);
   const [extraAnswers, setExtraAnswers] = useState<any[]>([]);
+  const [submittingExtra, setSubmittingExtra] = useState(false);
   
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [pendingExtras, setPendingExtras] = useState<ExtraActivity[]>([]);
@@ -47,8 +48,34 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
     }
   };
 
+  const handleSubmitExtra = async () => {
+    if (!extraSession) return;
+    setSubmittingExtra(true);
+    try {
+      const evaluation = await evaluateActivitySubmission(extraSession, extraAnswers);
+      const { error } = await supabase.from('activity_submissions').insert([{
+        activity_id: extraSession.id,
+        student_id: currentUser.id,
+        answers: extraAnswers,
+        score: evaluation.score,
+        feedback: evaluation.feedback
+      }]);
+
+      if (!error) {
+        alert(`Atividade enviada! Nota: ${evaluation.score.toFixed(1)}`);
+        setExtraSession(null);
+        fetchPendingExtras();
+      } else {
+        alert("Erro ao enviar: " + error.message);
+      }
+    } catch (e: any) {
+      alert("Erro na correção IA: " + e.message);
+    } finally {
+      setSubmittingExtra(false);
+    }
+  };
+
   const handleStartOfficial = async (subject: Subject) => {
-    // Verificar se o bimestre está bloqueado
     if (settings.isAssessmentLocked[settings.activeQuarter]) {
       alert(`As avaliações do ${settings.activeQuarter}º Bimestre estão bloqueadas pelo administrador.`);
       return;
@@ -56,7 +83,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
 
     setLoadingSubject(`official-${subject}`);
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('official_exams')
         .select('questions')
         .eq('subject', subject)
@@ -181,7 +208,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
             </div>
           </div>
           
-          {/* ... (Atividades extras mantidas iguais) ... */}
           <div className="space-y-4">
             <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><ClipboardList className="text-blue-600" size={20}/> Atividades Extras</h3>
             <div className="grid grid-cols-1 gap-4">
@@ -218,7 +244,71 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
         </div>
       </div>
 
-      {/* Modais de Foto e Atividade Extras mantidos... */}
+      {/* Modal de Responder Atividade Extra */}
+      {extraSession && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
+            <div className="p-8 bg-blue-600 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-2xl font-black">{extraSession.theme}</h3>
+                <p className="text-blue-100 text-xs font-bold uppercase tracking-widest">{extraSession.subject}</p>
+              </div>
+              <button onClick={() => setExtraSession(null)} className="p-2 hover:bg-white/20 rounded-full transition-colors"><X size={24}/></button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto space-y-8 flex-1">
+              {extraSession.questions.map((q, idx) => (
+                <div key={idx} className="space-y-4">
+                  <p className="font-bold text-slate-800 text-lg">{idx + 1}. {q.question}</p>
+                  {q.type === 'multiple' ? (
+                    <div className="grid grid-cols-1 gap-2">
+                      {q.options?.map((opt, oIdx) => (
+                        <button 
+                          key={oIdx}
+                          onClick={() => {
+                            const n = [...extraAnswers];
+                            n[idx] = oIdx;
+                            setExtraAnswers(n);
+                          }}
+                          className={`w-full text-left p-4 rounded-2xl border-2 transition-all flex items-center gap-3 ${extraAnswers[idx] === oIdx ? 'bg-blue-600 border-blue-600 text-white' : 'bg-slate-50 border-slate-100'}`}
+                        >
+                          <span className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-black ${extraAnswers[idx] === oIdx ? 'bg-white/20 text-white' : 'bg-white text-slate-400'}`}>
+                            {String.fromCharCode(65 + oIdx)}
+                          </span>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <textarea 
+                      className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                      placeholder="Sua resposta..."
+                      value={extraAnswers[idx]}
+                      onChange={(e) => {
+                        const n = [...extraAnswers];
+                        n[idx] = e.target.value;
+                        setExtraAnswers(n);
+                      }}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="p-8 border-t bg-slate-50 flex justify-end gap-4">
+              <button onClick={() => setExtraSession(null)} className="px-6 py-3 font-bold text-slate-400">Cancelar</button>
+              <button 
+                onClick={handleSubmitExtra}
+                disabled={submittingExtra || extraAnswers.some(a => a === '' || a === undefined)}
+                className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black shadow-xl shadow-blue-100 flex items-center gap-2 hover:bg-blue-700 transition-all disabled:opacity-50"
+              >
+                {submittingExtra ? <Loader2 size={20} className="animate-spin"/> : <Send size={20}/>}
+                Enviar Atividade
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

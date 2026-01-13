@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { UserProfile, GlobalSettings, Subject, ExtraActivity, ActivitySubmission, UserRole, Assessment } from '../types';
-import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History, Trash2, CheckCircle, AlertCircle, Wand2 } from 'lucide-react';
+import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History, Trash2, CheckCircle, AlertCircle, Wand2, Eye, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateExtraActivity } from '../services/geminiService';
 
@@ -30,6 +31,10 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   const [extraTheme, setExtraTheme] = useState('');
   const [genQuestions, setGenQuestions] = useState<any[] | null>(null);
 
+  // States para Visualização de Resultados
+  const [viewingActivity, setViewingActivity] = useState<ExtraActivity | null>(null);
+  const [submissions, setSubmissions] = useState<ActivitySubmission[]>([]);
+
   useEffect(() => {
     fetchMyTopics();
     fetchMyActivities();
@@ -47,6 +52,27 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   const fetchMyActivities = async () => {
     const { data } = await supabase.from('extra_activities').select('*').eq('teacher_id', currentUser.id).order('created_at', { ascending: false });
     if (data) setMyActivities(data.map(d => ({ ...d, teacherId: d.teacher_id, createdAt: d.created_at })));
+  };
+
+  const fetchSubmissions = async (activity: ExtraActivity) => {
+    setLoading(true);
+    setViewingActivity(activity);
+    const { data, error } = await supabase
+      .from('activity_submissions')
+      .select('*, profiles(full_name)')
+      .eq('activity_id', activity.id)
+      .order('created_at', { ascending: false });
+
+    if (data) {
+      setSubmissions(data.map(d => ({
+        ...d,
+        activityId: d.activity_id,
+        studentId: d.student_id,
+        studentName: d.profiles?.full_name,
+        createdAt: d.created_at
+      })));
+    }
+    setLoading(false);
   };
 
   const fetchStudents = async () => {
@@ -160,54 +186,114 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
 
         {activeTab === 'activities' && (
           <div className="space-y-10">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-              <div className="space-y-6 bg-slate-50 p-8 rounded-[32px] border border-slate-100">
-                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Sparkles className="text-blue-600"/> Gerar Nova Atividade com IA</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                   <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value as Subject)}>
-                      <option>História</option><option>Filosofia</option><option>Geografia</option><option>Sociologia</option>
-                   </select>
-                   <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
-                      <option>1ª</option><option>2ª</option><option>3ª</option>
-                   </select>
-                   <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
-                      <option value="Todas">Todas as Turmas</option>
-                      {CLASSES_BY_GRADE[selectedGrade]?.map(c => <option key={c} value={c}>Turma {c}</option>)}
-                   </select>
-                </div>
-                <input 
-                  className="w-full px-5 py-4 bg-white border rounded-2xl font-medium outline-none focus:ring-2 focus:ring-blue-500" 
-                  placeholder="Ex: Revolução Industrial, Ética de Kant, Globalização..." 
-                  value={extraTheme}
-                  onChange={(e) => setExtraTheme(e.target.value)}
-                />
-                <button 
-                  onClick={handleGenerateActivity}
-                  disabled={loading || !extraTheme}
-                  className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex justify-center items-center gap-2 disabled:opacity-50"
-                >
-                  {loading ? <Loader2 className="animate-spin" size={20}/> : <Wand2 size={20}/>} Gerar Questões com IA
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                <h3 className="text-xl font-bold text-slate-800">Atividades Publicadas</h3>
-                <div className="space-y-3">
-                  {myActivities.map(act => (
-                    <div key={act.id} className="p-4 border rounded-2xl flex justify-between items-center group hover:border-blue-200 transition-all">
-                      <div>
-                        <p className="text-[10px] font-black text-blue-600 uppercase">{act.subject} • {act.grade} Série {act.className ? `• ${act.className}` : '(Todas)'}</p>
-                        <h4 className="font-bold text-slate-700">{act.theme}</h4>
-                      </div>
-                      <button onClick={() => handleDeleteActivity(act.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+            {viewingActivity ? (
+              <div className="animate-in fade-in duration-300 space-y-6">
+                <div className="flex items-center justify-between border-b pb-4">
+                  <div className="flex items-center gap-4">
+                    <button onClick={() => setViewingActivity(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400"><ChevronLeft/></button>
+                    <div>
+                      <h3 className="text-2xl font-black text-slate-800">{viewingActivity.theme}</h3>
+                      <p className="text-slate-400 text-xs uppercase font-bold tracking-widest">{viewingActivity.subject} • {viewingActivity.grade} série</p>
                     </div>
-                  ))}
-                  {myActivities.length === 0 && <p className="text-center py-12 text-slate-400 italic text-sm">Nenhuma atividade criada ainda.</p>}
+                  </div>
+                  <button onClick={() => setViewingActivity(null)} className="p-2 text-slate-400 hover:text-red-500"><X/></button>
+                </div>
+
+                <div className="overflow-hidden border border-slate-100 rounded-[32px] bg-slate-50/50 shadow-inner">
+                  <table className="w-full text-left">
+                    <thead className="bg-white border-b border-slate-100">
+                      <tr>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Estudante</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Nota</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Feedback IA</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Data</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {submissions.map(sub => (
+                        <tr key={sub.id} className="hover:bg-white transition-colors">
+                          <td className="px-6 py-4">
+                            <p className="font-bold text-slate-700">{sub.studentName}</p>
+                            <p className="text-[10px] text-slate-400 font-medium">Submetido via Web</p>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`text-xl font-black ${sub.score >= 6 ? 'text-green-600' : 'text-red-500'}`}>{sub.score.toFixed(1)}</span>
+                          </td>
+                          <td className="px-6 py-4 max-w-xs">
+                            <p className="text-xs text-slate-600 italic line-clamp-2">"{sub.feedback}"</p>
+                          </td>
+                          <td className="px-6 py-4 text-[10px] font-bold text-slate-400">
+                            {new Date(sub.createdAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                      {submissions.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-12 text-center text-slate-400 italic text-sm">Nenhum aluno respondeu esta atividade ainda.</td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <div className="space-y-6 bg-slate-50 p-8 rounded-[32px] border border-slate-100">
+                  <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Sparkles className="text-blue-600"/> Gerar Nova Atividade com IA</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value as Subject)}>
+                        <option>História</option><option>Filosofia</option><option>Geografia</option><option>Sociologia</option>
+                    </select>
+                    <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
+                        <option>1ª</option><option>2ª</option><option>3ª</option>
+                    </select>
+                    <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
+                        <option value="Todas">Todas as Turmas</option>
+                        {CLASSES_BY_GRADE[selectedGrade]?.map(c => <option key={c} value={c}>Turma {c}</option>)}
+                    </select>
+                  </div>
+                  <input 
+                    className="w-full px-5 py-4 bg-white border rounded-2xl font-medium outline-none focus:ring-2 focus:ring-blue-500" 
+                    placeholder="Ex: Revolução Industrial, Ética de Kant, Globalização..." 
+                    value={extraTheme}
+                    onChange={(e) => setExtraTheme(e.target.value)}
+                  />
+                  <button 
+                    onClick={handleGenerateActivity}
+                    disabled={loading || !extraTheme}
+                    className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex justify-center items-center gap-2 disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 className="animate-spin" size={20}/> : <Wand2 size={20}/>} Gerar Questões com IA
+                  </button>
+                </div>
 
-            {genQuestions && (
+                <div className="space-y-6">
+                  <h3 className="text-xl font-bold text-slate-800">Atividades Publicadas</h3>
+                  <div className="space-y-3">
+                    {myActivities.map(act => (
+                      <div key={act.id} className="p-5 border rounded-[24px] bg-white hover:border-blue-200 transition-all group flex flex-col gap-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{act.subject} • {act.grade} Série {act.className ? `• ${act.className}` : '(Todas)'}</p>
+                            <h4 className="font-bold text-slate-800 text-lg">{act.theme}</h4>
+                          </div>
+                          <button onClick={() => handleDeleteActivity(act.id)} className="p-2 text-slate-200 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                        </div>
+                        <button 
+                          onClick={() => fetchSubmissions(act)}
+                          className="flex items-center justify-center gap-2 w-full py-3 bg-slate-50 text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                        >
+                          <Eye size={16}/> Ver Notas e Respostas
+                        </button>
+                      </div>
+                    ))}
+                    {myActivities.length === 0 && <p className="text-center py-12 text-slate-400 italic text-sm">Nenhuma atividade criada ainda.</p>}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {genQuestions && !viewingActivity && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 bg-white border-2 border-blue-500 rounded-[40px] p-10 space-y-8 shadow-2xl">
                 <div className="flex justify-between items-center border-b pb-6">
                   <div>
