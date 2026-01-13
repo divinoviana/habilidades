@@ -1,9 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, GlobalSettings, Subject, ExtraActivity, ActivitySubmission, UserRole, Assessment } from '../types';
-import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History, Trash2, CheckCircle, AlertCircle, Wand2, Eye, X, Filter, RefreshCw } from 'lucide-react';
+// Fix: Added missing User and Clock icons to the lucide-react imports list
+import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History, Trash2, CheckCircle, AlertCircle, Wand2, Eye, X, Filter, RefreshCw, MessageSquare, Plus, StickyNote, User, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateExtraActivity } from '../services/geminiService';
+
+interface StudentObservation {
+  id: string;
+  student_id: string;
+  teacher_id: string;
+  content: string;
+  created_at: string;
+}
 
 interface TeacherDashboardProps {
   currentUser: UserProfile;
@@ -20,7 +29,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   const [activeTab, setActiveTab] = useState<'topics' | 'activities' | 'carometro' | 'official_results'>('topics');
   const [selectedSubject, setSelectedSubject] = useState<Subject>('História');
   const [selectedGrade, setSelectedGrade] = useState('1ª');
-  const [selectedClass, setSelectedClass] = useState('13.01'); // Inicia com a primeira turma da 1ª série
+  const [selectedClass, setSelectedClass] = useState('13.01'); 
   const [loading, setLoading] = useState(false);
   
   const [myTopicsHistory, setMyTopicsHistory] = useState<any[]>([]);
@@ -34,6 +43,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   // States para Visualização de Resultados
   const [viewingActivity, setViewingActivity] = useState<ExtraActivity | null>(null);
   const [submissions, setSubmissions] = useState<ActivitySubmission[]>([]);
+
+  // States para Observações do Estudante
+  const [selectedStudent, setSelectedStudent] = useState<UserProfile | null>(null);
+  const [observations, setObservations] = useState<StudentObservation[]>([]);
+  const [newObservation, setNewObservation] = useState('');
+  const [isSavingObservation, setIsSavingObservation] = useState(false);
 
   useEffect(() => {
     fetchMyTopics();
@@ -87,7 +102,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
       query = query.eq('class_name', selectedClass);
     }
     
-    // Ordem alfabética rigorosa conforme solicitado
     const { data } = await query.order('full_name', { ascending: true });
     
     if (data) {
@@ -103,9 +117,48 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
     setLoading(false);
   };
 
+  const fetchObservations = async (studentId: string) => {
+    const { data } = await supabase
+      .from('student_observations')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false });
+    
+    if (data) setObservations(data);
+  };
+
+  const handleOpenStudent = (student: UserProfile) => {
+    setSelectedStudent(student);
+    fetchObservations(student.id);
+  };
+
+  const handleSaveObservation = async () => {
+    if (!newObservation.trim() || !selectedStudent) return;
+    setIsSavingObservation(true);
+    
+    const { error } = await supabase.from('student_observations').insert([{
+      student_id: selectedStudent.id,
+      teacher_id: currentUser.id,
+      content: newObservation.trim()
+    }]);
+
+    if (!error) {
+      setNewObservation('');
+      fetchObservations(selectedStudent.id);
+    } else {
+      alert("Erro ao salvar observação. Verifique se as tabelas foram criadas no Banco.");
+    }
+    setIsSavingObservation(false);
+  };
+
+  const handleDeleteObservation = async (id: string) => {
+    if (!confirm("Excluir esta anotação?")) return;
+    const { error } = await supabase.from('student_observations').delete().eq('id', id);
+    if (!error && selectedStudent) fetchObservations(selectedStudent.id);
+  };
+
   const handleGradeChange = (grade: string) => {
     setSelectedGrade(grade);
-    // Ao mudar a série, seleciona automaticamente a primeira turma daquela série
     const availableClasses = CLASSES_BY_GRADE[grade] || [];
     if (availableClasses.length > 0) {
       setSelectedClass(availableClasses[0]);
@@ -364,7 +417,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
             <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-b pb-8">
               <div>
                 <h3 className="font-black text-slate-800 text-3xl tracking-tighter">Carômetro Escolar</h3>
-                <p className="text-slate-500 text-sm">Visualização de estudantes por turma em ordem alfabética.</p>
+                <p className="text-slate-500 text-sm">Clique na foto do estudante para fazer observações pedagógicas.</p>
               </div>
               <div className="flex bg-slate-100 p-2 rounded-[24px] gap-2">
                 <div className="flex items-center gap-2 px-3">
@@ -405,7 +458,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
                 {students.map(s => (
-                  <div key={s.id} className="text-center group animate-fade-in">
+                  <div key={s.id} onClick={() => handleOpenStudent(s)} className="text-center group animate-fade-in cursor-pointer">
                     <div className="relative aspect-[4/5] bg-white rounded-[32px] overflow-hidden mb-3 border-2 border-slate-100 group-hover:border-blue-500 group-hover:shadow-2xl transition-all duration-300">
                       {s.avatarUrl ? (
                         <img src={s.avatarUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={s.fullName}/>
@@ -414,9 +467,15 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                           <Users size={48} strokeWidth={1}/>
                         </div>
                       )}
+                      
+                      {/* Overlay ao passar o mouse */}
+                      <div className="absolute inset-0 bg-blue-600/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                         <MessageSquare className="text-white" size={32} />
+                      </div>
+
                       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <span className="bg-blue-600 text-white text-[8px] font-black uppercase px-3 py-1 rounded-full shadow-lg">
-                          {s.className}
+                          Anotar
                         </span>
                       </div>
                     </div>
@@ -441,6 +500,79 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
           </div>
         )}
       </div>
+
+      {/* Modal de Observações do Estudante */}
+      {selectedStudent && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[85vh]">
+            <div className="p-8 bg-slate-900 text-white flex justify-between items-start">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white/20 border-2 border-white/10">
+                  {/* Fix: Icon reference fixed with missing User icon from imports */}
+                  {selectedStudent.avatarUrl ? <img src={selectedStudent.avatarUrl} className="w-full h-full object-cover" /> : <User className="p-4" />}
+                </div>
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-tighter">{selectedStudent.fullName}</h3>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">{selectedStudent.grade} Série • Turma {selectedStudent.className}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedStudent(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={24}/></button>
+            </div>
+
+            <div className="p-8 overflow-y-auto space-y-6 flex-1">
+              {/* Formulário de Nova Observação */}
+              <div className="bg-slate-50 p-4 rounded-3xl space-y-3 border border-slate-100 shadow-inner">
+                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                  <Plus size={12}/> Nova Anotação Pedagógica
+                </h4>
+                <textarea 
+                  className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none h-24"
+                  placeholder="Ex: Aluno disperso, usando celular, falta de material ou boa participação..."
+                  value={newObservation}
+                  onChange={(e) => setNewObservation(e.target.value)}
+                />
+                <button 
+                  onClick={handleSaveObservation}
+                  disabled={!newObservation.trim() || isSavingObservation}
+                  className="w-full bg-blue-600 text-white font-black py-3 rounded-2xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 disabled:opacity-50 transition-all shadow-lg shadow-blue-100"
+                >
+                  {isSavingObservation ? <Loader2 size={16} className="animate-spin" /> : <StickyNote size={16} />}
+                  Salvar Observação
+                </button>
+              </div>
+
+              {/* Lista de Observações Antigas */}
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest border-b pb-2">Histórico Comportamental</h4>
+                {observations.length === 0 ? (
+                  <p className="text-center py-10 text-slate-300 italic text-sm">Nenhuma observação registrada ainda.</p>
+                ) : (
+                  observations.map(obs => (
+                    <div key={obs.id} className="p-5 bg-white border border-slate-100 rounded-3xl relative group hover:shadow-md transition-all">
+                      <p className="text-sm text-slate-700 leading-relaxed italic">"{obs.content}"</p>
+                      <div className="mt-3 flex justify-between items-center border-t pt-3">
+                        <span className="text-[9px] font-bold text-slate-400 flex items-center gap-1 uppercase">
+                          {/* Fix: Icon reference fixed with missing Clock icon from imports */}
+                          <Clock size={10}/> {new Date(obs.created_at).toLocaleString()}
+                        </span>
+                        {obs.teacher_id === currentUser.id && (
+                          <button onClick={() => handleDeleteObservation(obs.id)} className="text-slate-300 hover:text-red-500 transition-colors p-1">
+                            <Trash2 size={14}/>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            
+            <div className="p-6 bg-slate-50 border-t flex justify-center">
+              <button onClick={() => setSelectedStudent(null)} className="text-slate-400 font-black text-xs uppercase tracking-widest hover:text-slate-600 transition-colors">Fechar Painel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

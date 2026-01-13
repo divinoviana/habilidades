@@ -194,10 +194,19 @@ CREATE TABLE IF NOT EXISTS activity_submissions (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS student_observations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    teacher_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 ALTER TABLE official_exams DISABLE ROW LEVEL SECURITY;
 ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;
 ALTER TABLE extra_activities DISABLE ROW LEVEL SECURITY;
-ALTER TABLE activity_submissions DISABLE ROW LEVEL SECURITY;`;
+ALTER TABLE activity_submissions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE student_observations DISABLE ROW LEVEL SECURITY;`;
 
   return (
     <div className="space-y-6">
