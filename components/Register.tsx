@@ -112,7 +112,7 @@ const Register: React.FC<RegisterProps> = ({ onRegister, onCancel }) => {
               <ArrowLeft size={18} /> Voltar para Login
             </button>
             <h2 className="text-3xl font-bold mb-3 leading-tight">Cadastre-se</h2>
-            <p className="text-blue-100 text-sm opacity-80">Junte-se à rede de ensino da EE Federico José Pedreira Neto.</p>
+            <p className="text-blue-100 text-sm opacity-80">Junte-se à rede de ensino da Escola Estadual Frederico José Pedreira.</p>
           </div>
           <div className="space-y-6">
             <div className={`flex items-center gap-3 transition-opacity duration-500 ${step === 1 ? 'opacity-100' : 'opacity-40'}`}>

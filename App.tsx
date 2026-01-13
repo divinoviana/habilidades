@@ -47,7 +47,7 @@ const App: React.FC = () => {
             <GraduationCap className="text-white w-6 h-6" />
           </div>
           <div>
-            <h1 className="font-bold text-slate-800 text-lg leading-tight">EE Federico José Pedreira Neto</h1>
+            <h1 className="font-bold text-slate-800 text-lg leading-tight">Escola Estadual Frederico José Pedreira</h1>
             <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Ciências Humanas & Sociais</p>
           </div>
         </div>
@@ -80,7 +80,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="bg-white border-t border-slate-200 p-4 text-center text-slate-400 text-xs">
-        &copy; 2024 SEDUC - Tocantins | Escola Federico José Pedreira Neto. Desenvolvido para Excelência Educacional.
+        &copy; 2024 SEDUC - Tocantins | Escola Estadual Frederico José Pedreira. Desenvolvido para Excelência Educacional.
       </footer>
     </div>
   );

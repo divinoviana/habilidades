@@ -69,7 +69,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
         alert("Erro ao enviar: " + error.message);
       }
     } catch (e: any) {
-      alert("Erro na correção IA: " + e.message);
+      alert("Erro na correção: " + e.message);
     } finally {
       setSubmittingExtra(false);
     }
@@ -124,7 +124,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
         alert("Não existem tópicos cadastrados para gerar este simulado.");
       }
     } catch (err: any) {
-      alert("Erro Gemini IA: " + err.message);
+      alert("Erro ao gerar simulado: " + err.message);
     }
     setLoadingSubject(null);
   };
@@ -199,7 +199,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
                         className="w-full bg-blue-50 text-blue-700 border border-blue-100 font-black py-4 rounded-2xl flex justify-center items-center gap-2 hover:bg-blue-100 transition-all disabled:opacity-50 text-[10px] tracking-widest"
                       >
                         {isMockLoading ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16} className="text-blue-400"/>}
-                        {isMockLoading ? 'GERANDO SIMULADO...' : 'TREINAR COM SIMULADO IA'}
+                        {isMockLoading ? 'GERANDO SIMULADO...' : 'TREINAR COM SIMULADO'}
                       </button>
                     </div>
                   </div>

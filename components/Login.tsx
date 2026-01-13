@@ -68,7 +68,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
             </div>
           </div>
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-slate-800">Escola Federico</h2>
+            <h2 className="text-2xl font-bold text-slate-800">Escola Estadual Frederico José Pedreira</h2>
             <p className="text-slate-500 text-sm font-medium uppercase tracking-wider">Sistema de Avaliação Inteligente</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-5">

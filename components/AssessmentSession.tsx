@@ -109,7 +109,7 @@ const AssessmentSession: React.FC<AssessmentSessionProps> = ({ subject, isMock, 
         <div className="bg-white rounded-3xl p-8 shadow-xl border border-slate-200 text-center">
           <CheckCircle2 size={64} className="text-green-500 mx-auto mb-4" />
           <h2 className="text-3xl font-bold text-slate-800 mb-2">Avaliação Concluída!</h2>
-          <p className="text-slate-500 mb-8">Parabéns, seu desempenho foi processado pelo Tutor de IA.</p>
+          <p className="text-slate-500 mb-8">Parabéns, seu desempenho foi processado pelo Retorno do Professor.</p>
           
           <div className="flex justify-center gap-12 mb-8">
             <div>
@@ -124,7 +124,7 @@ const AssessmentSession: React.FC<AssessmentSessionProps> = ({ subject, isMock, 
 
           <div className="bg-blue-50 p-6 rounded-2xl text-left border border-blue-100">
             <h3 className="font-bold text-blue-900 flex items-center gap-2 mb-3">
-              <Sparkles className="text-yellow-500" size={20} /> Feedback do Tutor de IA
+              <Sparkles className="text-yellow-500" size={20} /> Retorno do Professor
             </h3>
             {loadingFeedback ? (
               <div className="flex items-center gap-3 text-blue-400">
@@ -162,7 +162,7 @@ const AssessmentSession: React.FC<AssessmentSessionProps> = ({ subject, isMock, 
           </div>
           <div>
             <h2 className="font-bold text-slate-800">{subject}</h2>
-            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">{isMock ? 'Simulado IA' : 'Prova Oficial'}</p>
+            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">{isMock ? 'Simulado' : 'Prova Oficial'}</p>
           </div>
         </div>
         

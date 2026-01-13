@@ -205,7 +205,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                       <tr>
                         <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Estudante</th>
                         <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest text-center">Nota</th>
-                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Feedback IA</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Retorno do Professor</th>
                         <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 tracking-widest">Data</th>
                       </tr>
                     </thead>
@@ -239,7 +239,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                 <div className="space-y-6 bg-slate-50 p-8 rounded-[32px] border border-slate-100">
-                  <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Sparkles className="text-blue-600"/> Gerar Nova Atividade com IA</h3>
+                  <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Sparkles className="text-blue-600"/> Gerar Atividade Bimestral</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value as Subject)}>
                         <option>História</option><option>Filosofia</option><option>Geografia</option><option>Sociologia</option>
@@ -263,7 +263,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                     disabled={loading || !extraTheme}
                     className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex justify-center items-center gap-2 disabled:opacity-50"
                   >
-                    {loading ? <Loader2 className="animate-spin" size={20}/> : <Wand2 size={20}/>} Gerar Questões com IA
+                    {loading ? <Loader2 className="animate-spin" size={20}/> : <Wand2 size={20}/>} Gerar Avaliação Bimestral
                   </button>
                 </div>
 
@@ -297,7 +297,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 bg-white border-2 border-blue-500 rounded-[40px] p-10 space-y-8 shadow-2xl">
                 <div className="flex justify-between items-center border-b pb-6">
                   <div>
-                    <h3 className="text-2xl font-black text-slate-800">Revisão da Atividade IA</h3>
+                    <h3 className="text-2xl font-black text-slate-800">Revisão da Avaliação Bimestral</h3>
                     <p className="text-slate-500">Confira as questões geradas antes de enviar para os alunos.</p>
                   </div>
                   <div className="flex gap-3">
