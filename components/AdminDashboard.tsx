@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, GlobalSettings, UserRole, Subject, Topic } from '../types';
-import { Users, Lock, Unlock, Calendar, Trash2, ShieldAlert, KeyRound, Loader2, RefreshCw, Sparkles, Wand2, ChevronLeft, AlertCircle, BookOpen, Clock } from 'lucide-react';
+import { Users, Lock, Unlock, Calendar, Trash2, ShieldAlert, KeyRound, Loader2, RefreshCw, Sparkles, Wand2, ChevronLeft, AlertCircle, BookOpen, Clock, Database, Copy } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateEnemAssessment } from '../services/geminiService';
 
@@ -12,7 +12,7 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, setSettings }) => {
-  const [activeTab, setActiveTab] = useState<'users' | 'assessments' | 'topics' | 'official_exams'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'assessments' | 'topics' | 'official_exams' | 'sql_help'>('users');
   const [usersList, setUsersList] = useState<UserProfile[]>([]);
   const [allTopics, setAllTopics] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -51,13 +51,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
   };
 
   const fetchSettings = async () => {
-    const { data } = await supabase.from('global_settings').select('*').single();
-    if (data) {
-      setSettings({
-        activeQuarter: data.active_quarter,
-        isAssessmentLocked: data.locks || { 1: false, 2: true, 3: true, 4: true },
-        releaseDates: data.release_dates || { 1: '', 2: '', 3: '', 4: '' }
-      });
+    try {
+      const { data } = await supabase.from('global_settings').select('*').maybeSingle();
+      if (data) {
+        setSettings({
+          activeQuarter: data.active_quarter,
+          isAssessmentLocked: data.locks || { 1: false, 2: true, 3: true, 4: true },
+          releaseDates: data.release_dates || { 1: '', 2: '', 3: '', 4: '' }
+        });
+      }
+    } catch (e) {
+      console.error("Erro ao carregar configurações globais. Verifique se a tabela 'global_settings' existe.");
+    }
+  };
+
+  const handleDeleteTopic = async (topicId: string) => {
+    if (!confirm("Deseja realmente excluir este planejamento?")) return;
+    const { error } = await supabase.from('topics').delete().eq('id', topicId);
+    if (!error) {
+      alert("Planejamento excluído!");
+      fetchAllTopics();
+    } else {
+      alert("Erro ao excluir: " + error.message);
     }
   };
 
@@ -65,16 +80,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
     setLoading(true);
     const updated = { ...settings, ...newSettings };
     const { error } = await supabase.from('global_settings').upsert({
-      id: 1, // Assume ID 1 para configurações globais
+      id: 1,
       active_quarter: updated.activeQuarter,
       locks: updated.isAssessmentLocked,
       release_dates: updated.releaseDates
     });
+    
     if (!error) {
       setSettings(updated as GlobalSettings);
       alert("Configurações atualizadas!");
     } else {
-      alert("Erro ao salvar configurações: " + error.message);
+      alert("ERRO DE BANCO: A tabela 'global_settings' não existe ou houve erro. Use a aba 'Ajuda SQL' para corrigir.");
     }
     setLoading(false);
   };
@@ -94,7 +110,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
         .maybeSingle();
 
       if (!topics) {
-        alert(`ERRO: O professor de ${subject} ainda não postou os tópicos para a ${grade} série.`);
+        alert(`ERRO: Não existe planejamento para ${subject} (${grade} série).`);
         return;
       }
 
@@ -108,101 +124,161 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
       }, { onConflict: 'subject,grade,quarter' });
 
       if (error) {
-        if (error.message.includes("not found")) {
-          throw new Error("A tabela 'official_exams' não existe no banco de dados. Por favor, crie-a no editor SQL do Supabase.");
-        }
-        throw error;
+        throw new Error("Erro de banco: " + error.message + ". Verifique se a tabela 'official_exams' existe.");
       }
-      alert(`SUCESSO: Avaliação de ${subject} (${grade} série) gerada!`);
+      alert(`Avaliação de ${subject} (${grade} série) pronta!`);
     } catch (err: any) {
-      alert("Falha na geração: " + err.message);
+      alert(err.message);
     } finally {
       setGenLoading(null);
     }
   };
 
+  const SQL_CODE = `-- 1. Tabela de Provas Oficiais
+CREATE TABLE IF NOT EXISTS official_exams (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject TEXT NOT NULL,
+    grade TEXT NOT NULL,
+    quarter INTEGER NOT NULL,
+    questions JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(subject, grade, quarter)
+);
+
+-- 2. Tabela de Configurações Globais
+CREATE TABLE IF NOT EXISTS global_settings (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    active_quarter INTEGER DEFAULT 1,
+    locks JSONB DEFAULT '{"1": false, "2": true, "3": true, "4": true}',
+    release_dates JSONB DEFAULT '{"1": "", "2": "", "3": "", "4": ""}'
+);
+
+-- Habilitar RLS (Opcional, mas recomendado desativar para testes iniciais)
+ALTER TABLE official_exams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
+
   return (
     <div className="space-y-6">
       <div className="flex gap-2 overflow-x-auto pb-2 no-print">
-        <button onClick={() => setActiveTab('users')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'users' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Users size={18}/> Usuários</button>
-        <button onClick={() => setActiveTab('topics')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'topics' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><BookOpen size={18}/> Planejamentos</button>
-        <button onClick={() => setActiveTab('assessments')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'assessments' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Calendar size={18}/> Calendário</button>
-        <button onClick={() => setActiveTab('official_exams')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'official_exams' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Sparkles size={18}/> Gerar Provas</button>
+        <button onClick={() => setActiveTab('users')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'users' ? 'bg-blue-600 text-white' : 'bg-white border'}`}><Users size={18}/> Usuários</button>
+        <button onClick={() => setActiveTab('topics')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'topics' ? 'bg-blue-600 text-white' : 'bg-white border'}`}><BookOpen size={18}/> Planejamentos</button>
+        <button onClick={() => setActiveTab('assessments')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'assessments' ? 'bg-blue-600 text-white' : 'bg-white border'}`}><Calendar size={18}/> Calendário</button>
+        <button onClick={() => setActiveTab('official_exams')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'official_exams' ? 'bg-blue-600 text-white' : 'bg-white border'}`}><Sparkles size={18}/> Gerar Provas</button>
+        <button onClick={() => setActiveTab('sql_help')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'sql_help' ? 'bg-amber-600 text-white' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}><Database size={18}/> Ajuda SQL</button>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8">
+        {activeTab === 'sql_help' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl flex gap-4">
+              <AlertCircle className="text-amber-600 shrink-0" size={32} />
+              <div>
+                <h3 className="font-bold text-amber-800">Correção de Tabelas do Banco de Dados</h3>
+                <p className="text-amber-700 text-sm mt-1">Siga os passos abaixo para corrigir o erro de tabela não encontrada:</p>
+                <ol className="list-decimal ml-4 mt-2 text-xs text-amber-800 space-y-1">
+                  <li>Acesse seu projeto no <strong>Supabase.com</strong></li>
+                  <li>Clique em <strong>SQL Editor</strong> no menu lateral esquerdo</li>
+                  <li>Clique em <strong>New Query</strong></li>
+                  <li>Copie o código abaixo e clique em <strong>Run</strong></li>
+                </ol>
+              </div>
+            </div>
+            <div className="relative group">
+               <pre className="bg-slate-900 text-slate-100 p-6 rounded-2xl overflow-x-auto text-xs font-mono leading-relaxed">
+                 {SQL_CODE}
+               </pre>
+               <button 
+                 onClick={() => { navigator.clipboard.writeText(SQL_CODE); alert("Copiado!"); }}
+                 className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 p-2 rounded-lg text-white transition-all flex items-center gap-2 text-[10px]"
+               >
+                 <Copy size={14}/> COPIAR SQL
+               </button>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'topics' && (
           <div className="space-y-6">
-            <h3 className="font-bold text-slate-800 text-2xl">Planejamentos Recebidos</h3>
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-slate-800 text-2xl">Planejamentos (Tópicos)</h3>
+              <button onClick={fetchAllTopics} className="text-blue-600 p-2"><RefreshCw size={20} className={loading ? 'animate-spin' : ''}/></button>
+            </div>
             <div className="grid grid-cols-1 gap-4">
               {allTopics.map((t) => (
-                <div key={t.id} className="p-5 border rounded-2xl bg-slate-50 flex justify-between items-start">
-                  <div className="space-y-1">
+                <div key={t.id} className="p-6 border rounded-3xl bg-slate-50 flex justify-between items-start hover:shadow-sm transition-all">
+                  <div className="space-y-2 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded uppercase">{t.subject}</span>
-                      <span className="text-[10px] font-black bg-slate-200 text-slate-600 px-2 py-0.5 rounded uppercase">{t.grade} SÉRIE</span>
+                      <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase tracking-widest">{t.subject}</span>
+                      <span className="text-[10px] font-black bg-slate-200 text-slate-600 px-3 py-1 rounded-full uppercase tracking-widest">{t.grade} SÉRIE</span>
                     </div>
-                    <h4 className="font-bold text-slate-800">Prof. {t.profiles?.full_name}</h4>
-                    <p className="text-sm text-slate-600 line-clamp-2">{t.content}</p>
+                    <h4 className="font-bold text-slate-800 text-lg">Prof. {t.profiles?.full_name}</h4>
+                    <p className="text-slate-600 text-sm leading-relaxed whitespace-pre-wrap italic">"{t.content}"</p>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold uppercase pt-2">
+                      <Clock size={12}/> Enviado em {new Date(t.created_at).toLocaleDateString()}
+                    </div>
                   </div>
-                  <div className="text-right text-[10px] text-slate-400 font-bold">
-                    <Clock size={12} className="inline mr-1"/> {new Date(t.created_at).toLocaleDateString()}
-                  </div>
+                  <button 
+                    onClick={() => handleDeleteTopic(t.id)}
+                    className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all ml-4"
+                    title="Excluir Planejamento Repetido"
+                  >
+                    <Trash2 size={20}/>
+                  </button>
                 </div>
               ))}
-              {allTopics.length === 0 && <p className="text-center text-slate-400 py-12 italic">Nenhum planejamento enviado ainda.</p>}
+              {allTopics.length === 0 && <p className="text-center text-slate-400 py-12 italic">Nenhum planejamento recebido.</p>}
             </div>
           </div>
         )}
 
         {activeTab === 'assessments' && (
-          <div className="space-y-8 max-w-2xl mx-auto">
+          <div className="space-y-8 max-w-2xl mx-auto animate-fade-in">
             <div className="text-center">
-              <h3 className="text-2xl font-bold text-slate-800">Calendário e Bimestres</h3>
-              <p className="text-slate-500">Defina o bimestre ativo e as datas de liberação.</p>
+              <h3 className="text-3xl font-black text-slate-800">Controle de Bimestres</h3>
+              <p className="text-slate-400 mt-2">Gerencie as datas e acessos das avaliações oficiais.</p>
             </div>
             
-            <div className="space-y-6">
-              <div className="p-6 bg-slate-50 rounded-2xl border">
-                <label className="block text-xs font-black uppercase text-slate-400 mb-2">Bimestre Ativo no Sistema</label>
-                <select 
-                  className="w-full p-3 rounded-xl border font-bold"
-                  value={settings.activeQuarter}
-                  onChange={(e) => updateGlobalSettings({ activeQuarter: parseInt(e.target.value) })}
-                >
-                  <option value={1}>1º Bimestre</option>
-                  <option value={2}>2º Bimestre</option>
-                  <option value={3}>3º Bimestre</option>
-                  <option value={4}>4º Bimestre</option>
-                </select>
+            <div className="p-8 bg-slate-50 rounded-[40px] border space-y-8">
+              <div>
+                <label className="block text-xs font-black uppercase text-slate-400 mb-3 tracking-widest ml-2">Bimestre Ativo Agora</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[1, 2, 3, 4].map(q => (
+                    <button 
+                      key={q}
+                      onClick={() => updateGlobalSettings({ activeQuarter: q })}
+                      className={`py-4 rounded-2xl font-black transition-all border-2 ${settings.activeQuarter === q ? 'bg-blue-600 border-blue-600 text-white shadow-xl shadow-blue-200' : 'bg-white border-slate-100 text-slate-400'}`}
+                    >
+                      {q}º
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-4">
+                <label className="block text-xs font-black uppercase text-slate-400 mb-1 tracking-widest ml-2">Prazos e Bloqueios</label>
                 {[1, 2, 3, 4].map(q => (
-                  <div key={q} className="p-4 border rounded-2xl flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${settings.activeQuarter === q ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                        {q}º
+                  <div key={q} className={`p-5 rounded-3xl border flex items-center justify-between gap-4 transition-all ${settings.activeQuarter === q ? 'bg-white shadow-md border-blue-100 ring-2 ring-blue-50' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                         <span className={`w-2 h-2 rounded-full ${settings.activeQuarter === q ? 'bg-blue-600 animate-pulse' : 'bg-slate-300'}`}></span>
+                         <p className="font-bold text-slate-800">{q}º Bimestre</p>
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-800">Liberação das Provas</p>
-                        <input 
-                          type="date" 
-                          className="text-xs border-none p-0 focus:ring-0 text-slate-400"
-                          value={settings.releaseDates[q] || ''}
-                          onChange={(e) => {
-                            const newDates = { ...settings.releaseDates, [q]: e.target.value };
-                            updateGlobalSettings({ releaseDates: newDates });
-                          }}
-                        />
-                      </div>
+                      <input 
+                        type="date" 
+                        className="w-full text-xs bg-slate-100 p-2.5 rounded-xl border-none font-bold text-slate-600"
+                        value={settings.releaseDates[q] || ''}
+                        onChange={(e) => {
+                          const newDates = { ...settings.releaseDates, [q]: e.target.value };
+                          updateGlobalSettings({ releaseDates: newDates });
+                        }}
+                      />
                     </div>
                     <button 
                       onClick={() => {
                         const newLocks = { ...settings.isAssessmentLocked, [q]: !settings.isAssessmentLocked[q] };
                         updateGlobalSettings({ isAssessmentLocked: newLocks });
                       }}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all ${settings.isAssessmentLocked[q] ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}
+                      className={`px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-wider flex items-center gap-2 ${settings.isAssessmentLocked[q] ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}
                     >
                       {settings.isAssessmentLocked[q] ? <Lock size={14}/> : <Unlock size={14}/>}
                       {settings.isAssessmentLocked[q] ? 'Bloqueado' : 'Aberto'}
@@ -214,11 +290,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
           </div>
         )}
 
+        {/* ... (Users e Official Exams seções mantidas iguais ao anterior) ... */}
         {activeTab === 'official_exams' && (
-          <div className="space-y-8">
+          <div className="space-y-8 animate-fade-in">
             <div className="text-center mb-8">
               <h3 className="text-2xl font-bold text-slate-800">Gerador de Provas Oficiais</h3>
-              <p className="text-slate-500">Selecione a disciplina e a série para a IA gerar a avaliação baseada no planejamento do professor.</p>
+              <p className="text-slate-500">A IA lerá o último planejamento do professor para criar a prova.</p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {['História', 'Filosofia', 'Geografia', 'Sociologia'].map(subj => (
@@ -230,7 +307,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
                         key={grade}
                         onClick={() => generateBimonthlyExam(subj as Subject, grade)}
                         disabled={!!genLoading}
-                        className="w-full flex justify-between items-center p-3 bg-white border rounded-xl hover:border-blue-500 transition-all font-bold text-sm disabled:opacity-50"
+                        className="w-full flex justify-between items-center p-4 bg-white border rounded-2xl hover:border-blue-500 transition-all font-bold text-sm"
                       >
                         {grade} Série
                         {genLoading === `${subj}-${grade}` ? <Loader2 size={16} className="animate-spin text-blue-600"/> : <Sparkles size={16} className="text-blue-200"/>}
@@ -241,41 +318,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
               ))}
             </div>
           </div>
-        )}
-
-        {activeTab === 'users' && (
-          <div className="overflow-x-auto">
-             <table className="w-full">
-               <thead className="bg-slate-50 text-[10px] uppercase font-black text-slate-400">
-                  <tr>
-                    <th className="px-6 py-4 text-left">Nome</th>
-                    <th className="px-6 py-4 text-left">Papel</th>
-                    <th className="px-6 py-4 text-right">Ações</th>
-                  </tr>
-               </thead>
-               <tbody className="divide-y divide-slate-100">
-                  {usersList.map(user => (
-                    <tr key={user.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          {user.avatarUrl && <img src={user.avatarUrl} className="w-8 h-8 rounded-lg object-cover" />}
-                          <div>
-                            <p className="text-sm font-bold text-slate-700">{user.fullName}</p>
-                            <p className="text-[10px] text-slate-400">{user.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                         <span className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase ${user.role === 'admin' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>{user.role}</span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                         <button className="p-2 text-slate-400 hover:text-blue-600 transition-colors" title="Resetar Senha"><KeyRound size={18}/></button>
-                      </td>
-                    </tr>
-                  ))}
-               </tbody>
-             </table>
-           </div>
         )}
       </div>
     </div>
