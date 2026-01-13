@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserProfile, GlobalSettings, Subject, ExtraActivity, ActivitySubmission, UserRole, Assessment } from '../types';
-import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History, Trash2, CheckCircle, AlertCircle, Wand2, Eye, X, Filter, RefreshCw, MessageSquare, Plus, StickyNote, User, Clock, Search } from 'lucide-react';
+import { UserProfile, GlobalSettings, Subject, ExtraActivity, ActivitySubmission, UserRole, Assessment, Question } from '../types';
+import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History, Trash2, CheckCircle, AlertCircle, Wand2, Eye, X, Filter, RefreshCw, MessageSquare, Plus, StickyNote, User, Clock, Search, Quote, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateExtraActivity } from '../services/geminiService';
 
@@ -35,6 +35,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   const [myActivities, setMyActivities] = useState<ExtraActivity[]>([]);
   const [students, setStudents] = useState<UserProfile[]>([]);
   const [officialResults, setOfficialResults] = useState<any[]>([]);
+  const [viewingAssessment, setViewingAssessment] = useState<any | null>(null);
   
   const [extraTheme, setExtraTheme] = useState('');
   const [genQuestions, setGenQuestions] = useState<any[] | null>(null);
@@ -44,7 +45,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   const [selectedStudent, setSelectedStudent] = useState<UserProfile | null>(null);
   const [observations, setObservations] = useState<StudentObservation[]>([]);
   const [newObservation, setNewObservation] = useState('');
-  const [isSavingObservation, setIsSavingObservation] = useState(false);
 
   useEffect(() => {
     fetchMyTopics();
@@ -128,21 +128,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
     fetchObservations(student.id);
   };
 
-  const handleSaveObservation = async () => {
-    if (!newObservation.trim() || !selectedStudent) return;
-    setIsSavingObservation(true);
-    const { error } = await supabase.from('student_observations').insert([{ student_id: selectedStudent.id, teacher_id: currentUser.id, content: newObservation.trim() }]);
-    if (!error) { setNewObservation(''); fetchObservations(selectedStudent.id); }
-    else alert("Erro ao salvar observação.");
-    setIsSavingObservation(false);
-  };
-
-  const handleDeleteObservation = async (id: string) => {
-    if (!confirm("Excluir esta anotação?")) return;
-    const { error } = await supabase.from('student_observations').delete().eq('id', id);
-    if (!error && selectedStudent) fetchObservations(selectedStudent.id);
-  };
-
   const handleGradeChange = (grade: string) => {
     setSelectedGrade(grade);
     const availableClasses = CLASSES_BY_GRADE[grade] || [];
@@ -172,7 +157,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
     setLoading(true);
     const { error } = await supabase.from('extra_activities').insert([{ teacher_id: currentUser.id, subject: selectedSubject, grade: selectedGrade, class_name: selectedClass === 'Todas' ? null : selectedClass, theme: extraTheme, questions: genQuestions }]);
     if (!error) { alert("Atividade publicada!"); setGenQuestions(null); setExtraTheme(''); fetchMyActivities(); }
-    else alert("Erro ao publicar.");
     setLoading(false);
   };
 
@@ -232,7 +216,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                   <option value="Todas">Todas Turmas</option>
                   {CLASSES_BY_GRADE[selectedGrade]?.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
-                <button onClick={window.print} className="bg-slate-900 text-white p-2 rounded-xl"><Printer size={20}/></button>
+                <button onClick={window.print} className="bg-slate-900 text-white p-2 rounded-xl hover:scale-105 transition-all"><Printer size={20}/></button>
               </div>
             </div>
 
@@ -244,7 +228,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                     <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Turma</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Tipo</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400 text-center">Nota</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Data</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Ação</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -254,7 +238,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                       <td className="px-6 py-4 font-bold text-slate-500">{res.className}</td>
                       <td className="px-6 py-4"><span className={`text-[9px] font-black px-2 py-1 rounded-full ${res.is_mock ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>{res.is_mock ? 'SIMULADO' : 'OFICIAL'}</span></td>
                       <td className="px-6 py-4 text-center font-black text-lg">{res.score.toFixed(1)}</td>
-                      <td className="px-6 py-4 text-[10px] text-slate-400">{new Date(res.created_at).toLocaleDateString()}</td>
+                      <td className="px-6 py-4">
+                        <button onClick={() => setViewingAssessment(res)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Eye size={18}/></button>
+                      </td>
                     </tr>
                   ))}
                   {officialResults.length === 0 && <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400 italic">Nenhum resultado encontrado.</td></tr>}
@@ -264,7 +250,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
           </div>
         )}
 
-        {/* Mantém as outras abas atividades e carômetro conforme o original, ajustando apenas o que for essencial */}
+        {/* Mantém as outras abas atividades e carômetro */}
         {activeTab === 'activities' && (
           <div className="space-y-6">
              {viewingActivity ? (
@@ -300,8 +286,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                     </button>
                     {genQuestions && (
                       <div className="mt-6 p-4 bg-white border-2 border-blue-500 rounded-3xl space-y-4">
-                        <p className="text-center font-bold text-blue-600">Questões Geradas com Sucesso!</p>
-                        <button onClick={handlePublishActivity} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2"><Send size={18}/> Publicar para Estudantes</button>
+                        <p className="text-center font-bold text-blue-600">Questões Geradas!</p>
+                        <button onClick={handlePublishActivity} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2"><Send size={18}/> Publicar</button>
                       </div>
                     )}
                   </div>
@@ -333,16 +319,93 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
         )}
       </div>
 
-      {selectedStudent && (
+      {/* Modal Detalhado de Prova */}
+      {viewingAssessment && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-8 bg-slate-900 text-white flex justify-between items-center no-print">
+              <div>
+                <h3 className="font-black uppercase tracking-tighter">Relatório: {viewingAssessment.studentName}</h3>
+                <p className="text-xs font-bold text-slate-400 uppercase">{viewingAssessment.subject} • {viewingAssessment.is_mock ? 'Simulado' : 'Oficial'}</p>
+              </div>
+              <div className="flex gap-4">
+                <button onClick={window.print} className="bg-white/10 p-3 rounded-full hover:bg-white/20"><Printer size={20}/></button>
+                <button onClick={() => setViewingAssessment(null)} className="bg-white/10 p-3 rounded-full hover:bg-white/20"><X size={20}/></button>
+              </div>
+            </div>
+
+            <div className="p-10 overflow-y-auto space-y-8 print:p-0">
+              <div className="flex justify-between items-center border-b pb-6">
+                <div>
+                  <h4 className="font-black text-slate-800 text-2xl">Resultados Detalhados</h4>
+                  <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Nota Final: {viewingAssessment.score.toFixed(1)} / 10.0</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Escola Estadual Frederico José Pedreira</p>
+                  <p className="text-slate-400 font-bold text-xs">Data: {new Date(viewingAssessment.created_at).toLocaleDateString()}</p>
+                </div>
+              </div>
+
+              <div className="space-y-12">
+                {viewingAssessment.questions?.map((q: Question, idx: number) => {
+                  const studentAnswerIdx = viewingAssessment.answers ? viewingAssessment.answers[idx] : -1;
+                  const isCorrect = studentAnswerIdx === q.correctIndex;
+
+                  return (
+                    <div key={idx} className="space-y-4 border-b border-slate-100 pb-8 last:border-0 page-break-inside-avoid">
+                      <div className="flex justify-between items-start">
+                        <span className="bg-slate-900 text-white text-[10px] font-black px-3 py-1 rounded-lg uppercase">Questão {idx + 1}</span>
+                        <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase ${isCorrect ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                          {isCorrect ? 'Correta' : 'Incorreta'}
+                        </span>
+                      </div>
+                      
+                      {q.citation && (
+                        <div className="bg-slate-50 p-4 border-l-2 border-blue-600 italic text-slate-600 text-sm">"{q.citation}"</div>
+                      )}
+                      
+                      <p className="font-bold text-slate-800">{q.text}</p>
+
+                      <div className="grid grid-cols-1 gap-2 mt-4">
+                        {q.options.map((opt, oIdx) => (
+                          <div key={oIdx} className={`p-4 rounded-xl border flex items-center gap-4 text-xs ${
+                            oIdx === q.correctIndex ? 'bg-green-50 border-green-200 text-green-800 font-bold' :
+                            oIdx === studentAnswerIdx ? 'bg-red-50 border-red-200 text-red-800 font-bold' :
+                            'bg-white border-slate-100 text-slate-500'
+                          }`}>
+                            <span className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">{String.fromCharCode(65 + oIdx)}</span>
+                            {opt}
+                            {oIdx === q.correctIndex && <CheckCircle size={14} className="ml-auto"/>}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-4 p-4 bg-blue-50/30 rounded-2xl border border-blue-50">
+                        <p className="text-[9px] font-black text-blue-600 uppercase mb-1">Explicação Pedagógica</p>
+                        <p className="text-xs text-slate-600 italic">{q.explanation}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="bg-slate-900 p-8 rounded-[32px] text-white space-y-4">
+                 <h4 className="font-black text-xs uppercase tracking-widest flex items-center gap-2"><Sparkles size={16}/> Feedback da Inteligência Artificial</h4>
+                 <p className="text-slate-300 text-sm italic leading-relaxed">"{viewingAssessment.feedback}"</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedStudent && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 no-print">
           <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
               <h3 className="font-black uppercase tracking-tighter">{selectedStudent.fullName}</h3>
               <button onClick={() => setSelectedStudent(null)}><X/></button>
             </div>
             <div className="p-8 overflow-y-auto space-y-6">
-              <textarea className="w-full bg-slate-50 border p-4 rounded-2xl" placeholder="Anotação pedagógica..." value={newObservation} onChange={e => setNewObservation(e.target.value)} />
-              <button onClick={handleSaveObservation} className="w-full bg-blue-600 text-white font-black py-3 rounded-xl">Salvar</button>
               <div className="space-y-3">
                 {observations.map(o => (
                   <div key={o.id} className="p-4 bg-slate-50 border rounded-2xl">
@@ -356,14 +419,16 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
         </div>
       )}
 
-      {/* Estilo para Impressão */}
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          body { background: white !important; }
-          table { width: 100% !important; border-collapse: collapse; }
-          th, td { border: 1px solid #ddd !important; padding: 12px !important; }
+          body { background: white !important; padding: 0 !important; margin: 0 !important; }
+          .fixed { position: relative !important; background: transparent !important; }
+          .bg-white { background: transparent !important; box-shadow: none !important; }
+          .rounded-[40px] { border-radius: 0 !important; }
+          .max-h-[90vh] { max-height: none !important; overflow: visible !important; }
+          .p-10 { padding: 0 !important; }
+          .page-break-inside-avoid { page-break-inside: avoid; }
         }
       `}</style>
     </div>

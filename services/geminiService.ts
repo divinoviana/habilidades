@@ -23,7 +23,7 @@ export async function generateEnemAssessment(
     4. O comando deve exigir interpretação do texto-base.
     5. Distribua dificuldades entre easy, medium e hard.
 
-    RETORNE UM ARRAY JSON DE OBJETOS COM ESTA ESTRUTURA EXATA:
+    RETORNE UM ARRAY JSON DE OBJETOS COM ESTA ESTRUTURA:
     [{
       "id": "string_uuid",
       "citation": "texto_base",
@@ -61,7 +61,7 @@ export async function generateEnemAssessment(
     });
 
     const parsed = JSON.parse(response.text || "[]");
-    return parsed.slice(0, 5); // Garante o limite estrito de 5 questões
+    return parsed.slice(0, 5);
   } catch (error: any) {
     throw new Error("Falha ao gerar avaliação: " + error.message);
   }
@@ -79,7 +79,7 @@ export async function generateExtraActivity(
     REQUISITOS:
     1. Gere exatamente 5 questões (mescla de múltipla escolha e abertas).
     2. Questões abertas (type: "open") não devem ter options nem correctAnswer.
-    3. Use citações (citation) e descrições de imagens (visualDescription) em pelo menos 2 questões.
+    3. Use citações (citation) e descrições de imagens (visualDescription).
     
     FORMATO JSON ESTRITO:
     [{ 
@@ -117,7 +117,7 @@ export async function generateExtraActivity(
     });
 
     const parsed = JSON.parse(response.text || "[]");
-    return parsed.slice(0, 5); // Garante o limite estrito de 5 questões
+    return parsed.slice(0, 5);
   } catch (error: any) {
     throw new Error("Erro Gemini (Atividade): " + error.message);
   }
@@ -129,20 +129,15 @@ export async function evaluateActivitySubmission(
 ): Promise<{ score: number; feedback: string }> {
   try {
     const ai = getAI();
-    const prompt = `Aja como professor de Ciências Humanas. Corrija a atividade: ${JSON.stringify(activity)}
-    Respostas do Aluno: ${JSON.stringify(studentAnswers)}
-    Atribua uma nota de 0 a 10 e forneça um feedback pedagógico focado em melhoria.
-    Retorne em JSON: { "score": 8.5, "feedback": "Texto de feedback" }`;
-
+    const prompt = `Corrija esta atividade. JSON Atividade: ${JSON.stringify(activity)}. Respostas Aluno: ${JSON.stringify(studentAnswers)}. Retorne JSON: { "score": 0-10, "feedback": "texto" }`;
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });
-
-    return JSON.parse(response.text || '{"score":0,"feedback":"Erro na correção."}');
+    return JSON.parse(response.text || '{"score":0,"feedback":"Erro."}');
   } catch (error) {
-    return { score: 0, feedback: "Falha na correção automática." };
+    return { score: 0, feedback: "Erro na correção automática." };
   }
 }
 
@@ -153,15 +148,8 @@ export async function generateAIFeedback(
 ): Promise<string> {
   try {
     const ai = getAI();
-    const prompt = `Analise o desempenho do aluno em ${subject}.
-    Questões: ${JSON.stringify(questions)}
-    Respostas (índices): ${JSON.stringify(answers)}
-    Gere um feedback detalhado, destacando competências da BNCC e o que revisar para o ENEM.`;
-    
-    const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
-      contents: prompt
-    });
+    const prompt = `Feedback para aluno de ${subject}. Questões: ${JSON.stringify(questions)}. Respostas: ${JSON.stringify(answers)}. Seja encorajador e aponte o que estudar para o ENEM.`;
+    const response = await ai.models.generateContent({ model: "gemini-3-pro-preview", contents: prompt });
     return response.text || "Feedback indisponível.";
   } catch (error) {
     return "Feedback indisponível.";

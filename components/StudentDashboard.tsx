@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { UserProfile, GlobalSettings, Subject, Assessment, ExtraActivity } from '../types';
+import React, { useState, useEffect } from 'react';
+import { UserProfile, GlobalSettings, Subject, Assessment, ExtraActivity, Question } from '../types';
 import { Sparkles, History, Loader2, FileCheck, ClipboardList, Send, CheckCircle2, User, Camera, Upload, ChevronLeft, RefreshCw, BookOpen, AlertCircle, X, Quote, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import AssessmentSession from './AssessmentSession';
@@ -13,6 +13,8 @@ interface StudentDashboardProps {
 
 const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settings }) => {
   const [session, setSession] = useState<{ active: boolean; subject?: Subject; isMock: boolean }>({ active: false, isMock: false });
+  const [activeQuestions, setActiveQuestions] = useState<Question[]>([]);
+  
   const [extraSession, setExtraSession] = useState<ExtraActivity | null>(null);
   const [extraAnswers, setExtraAnswers] = useState<any[]>([]);
   const [submittingExtra, setSubmittingExtra] = useState(false);
@@ -20,7 +22,6 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [pendingExtras, setPendingExtras] = useState<ExtraActivity[]>([]);
   const [loadingSubject, setLoadingSubject] = useState<string | null>(null);
-  const [isChangingPhoto, setIsChangingPhoto] = useState(false);
 
   const subjects: Subject[] = ['História', 'Filosofia', 'Geografia', 'Sociologia'];
 
@@ -57,15 +58,12 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
       }]);
 
       if (!error) {
-        alert(`Atividade enviada com sucesso!`);
+        alert(`Atividade enviada! Nota: ${evaluation.score}`);
         setExtraSession(null);
         fetchPendingExtras();
-      } else throw error;
-    } catch (e: any) {
-      alert("Erro no envio: " + e.message);
-    } finally {
-      setSubmittingExtra(false);
-    }
+      }
+    } catch (e: any) { alert("Erro no envio: " + e.message); }
+    finally { setSubmittingExtra(false); }
   };
 
   const handleStartOfficial = async (subject: Subject) => {
@@ -76,13 +74,13 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
     setLoadingSubject(`official-${subject}`);
     try {
       const { data } = await supabase.from('official_exams').select('questions').eq('subject', subject).eq('grade', currentUser.grade).eq('quarter', settings.activeQuarter).maybeSingle();
-      if (data) {
-        (window as any)._currentQuestions = data.questions;
+      if (data && data.questions && data.questions.length > 0) {
+        setActiveQuestions(data.questions);
         setSession({ active: true, subject, isMock: false });
-      } else alert(`Prova de ${subject} indisponível.`);
-    } catch (e: any) {
-      alert("Erro ao carregar prova.");
-    }
+      } else {
+        alert(`Prova de ${subject} não disponível ou sem questões cadastradas.`);
+      }
+    } catch (e: any) { alert("Erro ao carregar prova."); }
     setLoadingSubject(null);
   };
 
@@ -92,24 +90,24 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
       const { data } = await supabase.from('topics').select('content').eq('subject', subject).eq('grade', currentUser.grade).eq('quarter', settings.activeQuarter).order('created_at', { ascending: false }).limit(1).maybeSingle();
       if (data) {
         const qs = await generateEnemAssessment(subject, data.content, currentUser.grade || '1ª');
-        (window as any)._currentQuestions = qs;
-        setSession({ active: true, subject, isMock: true });
+        if (qs && qs.length > 0) {
+          setActiveQuestions(qs);
+          setSession({ active: true, subject, isMock: true });
+        } else alert("Não foi possível gerar questões.");
       } else alert("Sem planejamento para gerar simulado.");
-    } catch (err: any) {
-      alert("Erro ao gerar simulado.");
-    }
+    } catch (err: any) { alert("Erro ao gerar simulado."); }
     setLoadingSubject(null);
   };
 
-  if (session.active && session.subject) {
+  if (session.active && session.subject && activeQuestions.length > 0) {
     return (
       <AssessmentSession 
         subject={session.subject} 
         isMock={session.isMock} 
         currentUser={currentUser} 
-        questions={(window as any)._currentQuestions} 
-        onComplete={() => { setSession({ active: false, isMock: false }); fetchAssessments(); }} 
-        onCancel={() => setSession({ active: false, isMock: false })} 
+        questions={activeQuestions} 
+        onComplete={() => { setSession({ active: false, isMock: false }); setActiveQuestions([]); fetchAssessments(); }} 
+        onCancel={() => { setSession({ active: false, isMock: false }); setActiveQuestions([]); }} 
       />
     );
   }
