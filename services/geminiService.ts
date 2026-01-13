@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, Subject } from "../types";
 
@@ -20,12 +19,12 @@ export async function generateEnemAssessment(
     const prompt = `Gere uma avaliação no padrão ENEM para a disciplina de ${subject} para a ${grade} série do Ensino Médio.
     Os tópicos trabalhados foram: ${topics}.
     Gere exatamente 5 questões de múltipla escolha.
-    As questões devem seguir a Teoria da Resposta ao Item (TRI): 1 fácil, 3 médias e 1 difícil.
     Cada questão deve ter um texto base ou contexto, comando da questão, 5 opções (A-E) e uma explicação detalhada.
     Retorne um array de objetos JSON.`;
 
+    // Using gemini-3-pro-preview for complex reasoning task (standardized exam generation)
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -50,14 +49,9 @@ export async function generateEnemAssessment(
       }
     });
 
-    if (!response.text) throw new Error("A IA retornou uma resposta vazia.");
-    return JSON.parse(response.text);
+    return JSON.parse(response.text || "[]");
   } catch (error: any) {
-    console.error("Erro Gemini:", error);
-    if (error.status === 429 || error.message?.includes("429")) {
-      throw new Error("Limite de uso da IA atingido. Por favor, aguarde 1 minuto e tente novamente.");
-    }
-    throw new Error("Falha ao gerar conteúdo com IA: " + (error.message || "Erro desconhecido"));
+    throw new Error("Falha ao gerar prova com IA: " + error.message);
   }
 }
 
@@ -68,22 +62,23 @@ export async function generateExtraActivity(
 ) {
   try {
     const ai = getAI();
-    const prompt = `Crie uma Atividade Extra de ${subject} para a ${grade} série do Ensino Médio sobre o tema: "${theme}".
-    A atividade deve conter 3 questões. As questões podem ser de múltipla escolha ou abertas.
-    Retorne um JSON seguindo este esquema: 
-    [{ "question": "texto", "type": "multiple" | "open", "options": ["A", "B", "C", "D"], "correctAnswer": 0 }]`;
+    const prompt = `Crie uma Atividade de ${subject} para a ${grade} série sobre: "${theme}".
+    Retorne exatamente 3 questões. Algumas de múltipla escolha e pelo menos uma aberta.
+    FORMATO JSON OBRIGATÓRIO:
+    [{ "question": "texto da pergunta", "type": "multiple" | "open", "options": ["A", "B", "C", "D"], "correctAnswer": 0 }]`;
 
+    // Using gemini-3-pro-preview for generating high-quality educational content
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json"
       }
     });
 
-    return JSON.parse(response.text);
+    return JSON.parse(response.text || "[]");
   } catch (error: any) {
-    throw new Error("Erro ao gerar atividade extra: " + error.message);
+    throw new Error("Erro Gemini: " + error.message);
   }
 }
 
@@ -93,23 +88,21 @@ export async function evaluateActivitySubmission(
 ): Promise<{ score: number; feedback: string }> {
   try {
     const ai = getAI();
-    const prompt = `Aja como um professor avaliador. Corrija as respostas de um aluno para esta atividade:
-    Atividade: ${JSON.stringify(activity)}
-    Respostas do Aluno: ${JSON.stringify(studentAnswers)}
-    Atribua uma nota de 0 a 10 e forneça um feedback pedagógico curto e direto.
-    Retorne JSON: { "score": 8.5, "feedback": "texto" }`;
+    const prompt = `Aja como professor. Atividade: ${JSON.stringify(activity)}. Respostas: ${JSON.stringify(studentAnswers)}. 
+    Dê nota 0-10 e feedback. Retorne JSON: { "score": 8, "feedback": "texto" }`;
 
+    // Using gemini-3-pro-preview for complex evaluation and pedagogical scoring
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json"
       }
     });
 
-    return JSON.parse(response.text);
+    return JSON.parse(response.text || '{"score":0,"feedback":"Erro"}');
   } catch (error: any) {
-    return { score: 0, feedback: "Erro na correção automática: " + error.message };
+    return { score: 0, feedback: "Falha na correção: " + error.message };
   }
 }
 
@@ -120,17 +113,14 @@ export async function generateAIFeedback(
 ): Promise<string> {
   try {
     const ai = getAI();
-    const prompt = `Analise o desempenho de um estudante na avaliação de ${subject}.
-    Questões e Respostas: ${JSON.stringify(questions.map((q, i) => ({ q: q.text, correct: q.correctIndex, student: answers[i] })))}
-    Forneça um feedback pedagógico incentivador em português.`;
-
+    const prompt = `Dê um feedback pedagógico incentivador para o aluno em ${subject}. Resultados: ${JSON.stringify(answers)}.`;
+    // Using gemini-3-pro-preview for nuanced and high-quality educational feedback
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview",
       contents: prompt
     });
-
     return response.text || "Feedback indisponível.";
   } catch (error) {
-    return "Feedback indisponível no momento.";
+    return "Feedback indisponível.";
   }
 }

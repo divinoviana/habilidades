@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { UserProfile, GlobalSettings, Subject, Topic, ExtraActivity, ActivitySubmission, UserRole, Assessment } from '../types';
-import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History } from 'lucide-react';
+import { UserProfile, GlobalSettings, Subject, ExtraActivity, ActivitySubmission, UserRole, Assessment } from '../types';
+import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History, Trash2, CheckCircle, AlertCircle, Wand2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateExtraActivity } from '../services/geminiService';
 
@@ -17,24 +16,19 @@ const CLASSES_BY_GRADE: { [key: string]: string[] } = {
 };
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settings }) => {
-  const [activeTab, setActiveTab] = useState<'topics' | 'activities' | 'carometro' | 'official_results' | 'profile'>('topics');
+  const [activeTab, setActiveTab] = useState<'topics' | 'activities' | 'carometro' | 'official_results'>('topics');
   const [selectedSubject, setSelectedSubject] = useState<Subject>('História');
   const [selectedGrade, setSelectedGrade] = useState('1ª');
   const [selectedClass, setSelectedClass] = useState('Todas');
   const [loading, setLoading] = useState(false);
   
-  // States
-  const [officialResults, setOfficialResults] = useState<any[]>([]);
-  const [selectedResult, setSelectedResult] = useState<any>(null);
   const [myTopicsHistory, setMyTopicsHistory] = useState<any[]>([]);
-  const [students, setStudents] = useState<UserProfile[]>([]);
-  const [loadingStudents, setLoadingStudents] = useState(false);
   const [myActivities, setMyActivities] = useState<ExtraActivity[]>([]);
-  const [newTopic, setNewTopic] = useState('');
+  const [students, setStudents] = useState<UserProfile[]>([]);
+  
+  // States para Nova Atividade
   const [extraTheme, setExtraTheme] = useState('');
-  const [generatedQuestions, setGeneratedQuestions] = useState<any[] | null>(null);
-  const [submissions, setSubmissions] = useState<ActivitySubmission[]>([]);
-  const [viewingResults, setViewingResults] = useState<string | null>(null);
+  const [genQuestions, setGenQuestions] = useState<any[] | null>(null);
 
   useEffect(() => {
     fetchMyTopics();
@@ -42,38 +36,24 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'carometro') fetchStudentsForCarometro();
-    if (activeTab === 'official_results') fetchOfficialResults();
-  }, [activeTab, selectedGrade, selectedClass, selectedSubject]);
+    if (activeTab === 'carometro') fetchStudents();
+  }, [activeTab, selectedGrade, selectedClass]);
 
   const fetchMyTopics = async () => {
     const { data } = await supabase.from('topics').select('*').eq('teacher_id', currentUser.id).order('created_at', { ascending: false });
     if (data) setMyTopicsHistory(data);
   };
 
-  const fetchOfficialResults = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('assessments')
-      .select('*, profiles(full_name, grade, class_name)')
-      .eq('subject', selectedSubject)
-      .eq('is_mock', false);
-    if (data) setOfficialResults(data);
-    setLoading(false);
+  const fetchMyActivities = async () => {
+    const { data } = await supabase.from('extra_activities').select('*').eq('teacher_id', currentUser.id).order('created_at', { ascending: false });
+    if (data) setMyActivities(data.map(d => ({ ...d, teacherId: d.teacher_id, createdAt: d.created_at })));
   };
 
-  const fetchStudentsForCarometro = async () => {
-    setLoadingStudents(true);
+  const fetchStudents = async () => {
     let query = supabase.from('profiles').select('*').eq('role', 'student').eq('grade', selectedGrade);
     if (selectedClass !== 'Todas') query = query.eq('class_name', selectedClass);
     const { data } = await query.order('full_name');
     if (data) setStudents(data.map(u => ({ ...u, fullName: u.full_name, role: u.role as UserRole, avatarUrl: u.avatar_url })));
-    setLoadingStudents(false);
-  };
-
-  const fetchMyActivities = async () => {
-    const { data } = await supabase.from('extra_activities').select('*').eq('teacher_id', currentUser.id).order('created_at', { ascending: false });
-    if (data) setMyActivities(data.map(d => ({ ...d, teacherId: d.teacher_id, createdAt: d.created_at })));
   };
 
   const handleSaveTopic = async () => {
@@ -89,11 +69,52 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
     if (!error) {
       setNewTopic('');
       fetchMyTopics();
-      alert("Planejamento enviado com sucesso!");
-    } else {
-      alert("Erro ao salvar: " + error.message);
+      alert("Planejamento enviado!");
     }
     setLoading(false);
+  };
+  const [newTopic, setNewTopic] = useState('');
+
+  const handleGenerateActivity = async () => {
+    if (!extraTheme) return;
+    setLoading(true);
+    try {
+      const qs = await generateExtraActivity(selectedSubject, extraTheme, selectedGrade);
+      setGenQuestions(qs);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePublishActivity = async () => {
+    if (!genQuestions) return;
+    setLoading(true);
+    const { error } = await supabase.from('extra_activities').insert([{
+      teacher_id: currentUser.id,
+      subject: selectedSubject,
+      grade: selectedGrade,
+      class_name: selectedClass === 'Todas' ? null : selectedClass,
+      theme: extraTheme,
+      questions: genQuestions
+    }]);
+
+    if (!error) {
+      alert("Atividade publicada para os alunos!");
+      setGenQuestions(null);
+      setExtraTheme('');
+      fetchMyActivities();
+    } else {
+      alert("Erro ao publicar: " + error.message);
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteActivity = async (id: string) => {
+    if (!confirm("Excluir esta atividade?")) return;
+    await supabase.from('extra_activities').delete().eq('id', id);
+    fetchMyActivities();
   };
 
   return (
@@ -101,7 +122,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
       <div className="flex flex-wrap gap-2 overflow-x-auto pb-2 no-print">
         <button onClick={() => setActiveTab('topics')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'topics' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><BookOpen size={18}/> Planejamento</button>
         <button onClick={() => setActiveTab('activities')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'activities' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><FilePlus size={18}/> Atividades Extras</button>
-        <button onClick={() => setActiveTab('official_results')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'official_results' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><FileText size={18}/> Resultados Oficiais</button>
         <button onClick={() => setActiveTab('carometro')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'carometro' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Contact2 size={18}/> Carômetro</button>
       </div>
 
@@ -118,9 +138,9 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                   <option>1ª</option><option>2ª</option><option>3ª</option>
                 </select>
               </div>
-              <textarea className="w-full h-48 px-5 py-4 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" placeholder="Digite os temas, competências e tópicos que serão cobrados na prova oficial deste bimestre..." value={newTopic} onChange={(e) => setNewTopic(e.target.value)} />
-              <button onClick={handleSaveTopic} disabled={loading || !newTopic} className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl flex justify-center gap-2">
-                {loading ? <Loader2 className="animate-spin" size={20}/> : <Send size={18}/>} Enviar para o Administrador
+              <textarea className="w-full h-48 px-5 py-4 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" placeholder="Digite os temas, competências e tópicos..." value={newTopic} onChange={(e) => setNewTopic(e.target.value)} />
+              <button onClick={handleSaveTopic} disabled={loading || !newTopic} className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl flex justify-center gap-2 disabled:opacity-50">
+                {loading ? <Loader2 className="animate-spin" size={20}/> : <Send size={18}/>} Enviar Planejamento
               </button>
             </div>
             
@@ -128,17 +148,96 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
               <h4 className="font-bold text-slate-800 flex items-center gap-2"><History size={18} className="text-blue-600"/> Meus Envios</h4>
               <div className="space-y-3 overflow-y-auto max-h-[500px] pr-2">
                 {myTopicsHistory.map(t => (
-                  <div key={t.id} className="p-3 bg-white border rounded-xl text-xs space-y-2">
-                    <div className="flex justify-between font-black uppercase text-blue-600">
-                      <span>{t.subject} • {t.grade}</span>
-                      <span className="text-slate-300">{new Date(t.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <p className="text-slate-600 line-clamp-3 italic">"{t.content}"</p>
+                  <div key={t.id} className="p-3 bg-white border rounded-xl text-xs space-y-1">
+                    <p className="font-black text-blue-600 uppercase">{t.subject} • {t.grade}</p>
+                    <p className="text-slate-600 line-clamp-2 italic">"{t.content}"</p>
                   </div>
                 ))}
-                {myTopicsHistory.length === 0 && <p className="text-center text-slate-400 py-8 italic">Nenhum histórico.</p>}
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'activities' && (
+          <div className="space-y-10">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              <div className="space-y-6 bg-slate-50 p-8 rounded-[32px] border border-slate-100">
+                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Sparkles className="text-blue-600"/> Gerar Nova Atividade com IA</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                   <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value as Subject)}>
+                      <option>História</option><option>Filosofia</option><option>Geografia</option><option>Sociologia</option>
+                   </select>
+                   <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
+                      <option>1ª</option><option>2ª</option><option>3ª</option>
+                   </select>
+                   <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
+                      <option value="Todas">Todas as Turmas</option>
+                      {CLASSES_BY_GRADE[selectedGrade]?.map(c => <option key={c} value={c}>Turma {c}</option>)}
+                   </select>
+                </div>
+                <input 
+                  className="w-full px-5 py-4 bg-white border rounded-2xl font-medium outline-none focus:ring-2 focus:ring-blue-500" 
+                  placeholder="Ex: Revolução Industrial, Ética de Kant, Globalização..." 
+                  value={extraTheme}
+                  onChange={(e) => setExtraTheme(e.target.value)}
+                />
+                <button 
+                  onClick={handleGenerateActivity}
+                  disabled={loading || !extraTheme}
+                  className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all flex justify-center items-center gap-2 disabled:opacity-50"
+                >
+                  {loading ? <Loader2 className="animate-spin" size={20}/> : <Wand2 size={20}/>} Gerar Questões com IA
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <h3 className="text-xl font-bold text-slate-800">Atividades Publicadas</h3>
+                <div className="space-y-3">
+                  {myActivities.map(act => (
+                    <div key={act.id} className="p-4 border rounded-2xl flex justify-between items-center group hover:border-blue-200 transition-all">
+                      <div>
+                        <p className="text-[10px] font-black text-blue-600 uppercase">{act.subject} • {act.grade} Série {act.className ? `• ${act.className}` : '(Todas)'}</p>
+                        <h4 className="font-bold text-slate-700">{act.theme}</h4>
+                      </div>
+                      <button onClick={() => handleDeleteActivity(act.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                    </div>
+                  ))}
+                  {myActivities.length === 0 && <p className="text-center py-12 text-slate-400 italic text-sm">Nenhuma atividade criada ainda.</p>}
+                </div>
+              </div>
+            </div>
+
+            {genQuestions && (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 bg-white border-2 border-blue-500 rounded-[40px] p-10 space-y-8 shadow-2xl">
+                <div className="flex justify-between items-center border-b pb-6">
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-800">Revisão da Atividade IA</h3>
+                    <p className="text-slate-500">Confira as questões geradas antes de enviar para os alunos.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button onClick={() => setGenQuestions(null)} className="px-6 py-3 font-bold text-slate-400 hover:text-slate-600">Descartar</button>
+                    <button onClick={handlePublishActivity} className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black flex items-center gap-2 shadow-lg shadow-blue-100 hover:scale-105 transition-all"><Send size={18}/> Publicar para {selectedClass === 'Todas' ? `toda a ${selectedGrade} série` : `a turma ${selectedClass}`}</button>
+                  </div>
+                </div>
+                <div className="space-y-6">
+                  {genQuestions.map((q, idx) => (
+                    <div key={idx} className="p-6 bg-slate-50 rounded-2xl space-y-4">
+                      <p className="font-bold text-slate-800">{idx + 1}. {q.question}</p>
+                      {q.type === 'multiple' && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {q.options.map((opt: string, oIdx: number) => (
+                            <div key={oIdx} className={`p-3 rounded-xl border text-sm ${q.correctAnswer === oIdx ? 'bg-green-50 border-green-200 text-green-700 font-bold' : 'bg-white border-slate-100'}`}>
+                              {String.fromCharCode(65 + oIdx)}. {opt}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {q.type === 'open' && <div className="p-4 bg-white border border-dashed rounded-xl text-xs text-slate-400">Resposta aberta do aluno</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -162,11 +261,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
               ))}
             </div>
           </div>
-        )}
-        
-        {/* Atividades e Resultados mantidos como antes mas integrados na nova estrutura */}
-        {activeTab === 'activities' && (
-          <div className="text-center py-12 text-slate-400 italic">Área de Atividades Extras carregada com sucesso. Selecione um tema para gerar.</div>
         )}
       </div>
     </div>
