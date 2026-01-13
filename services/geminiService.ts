@@ -1,12 +1,10 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, Subject } from "../types";
 
+// Always use process.env.API_KEY directly as it is assumed to be pre-configured.
 const getAI = () => {
-  const apiKey = process.env.API_KEY || (import.meta as any).env?.VITE_API_KEY;
-  if (!apiKey) {
-    throw new Error("Chave de API (API_KEY) não encontrada nas configurações do sistema.");
-  }
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 };
 
 export async function generateEnemAssessment(
@@ -49,6 +47,7 @@ export async function generateEnemAssessment(
       }
     });
 
+    // Access .text property directly
     return JSON.parse(response.text || "[]");
   } catch (error: any) {
     throw new Error("Falha ao gerar prova com IA: " + error.message);
@@ -76,6 +75,7 @@ export async function generateExtraActivity(
       }
     });
 
+    // Access .text property directly
     return JSON.parse(response.text || "[]");
   } catch (error: any) {
     throw new Error("Erro Gemini: " + error.message);
@@ -100,6 +100,7 @@ export async function evaluateActivitySubmission(
       }
     });
 
+    // Access .text property directly
     return JSON.parse(response.text || '{"score":0,"feedback":"Erro"}');
   } catch (error: any) {
     return { score: 0, feedback: "Falha na correção: " + error.message };
@@ -119,6 +120,7 @@ export async function generateAIFeedback(
       model: "gemini-3-pro-preview",
       contents: prompt
     });
+    // Access .text property directly
     return response.text || "Feedback indisponível.";
   } catch (error) {
     return "Feedback indisponível.";

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, GlobalSettings, Subject, ExtraActivity, ActivitySubmission, UserRole, Assessment } from '../types';
-import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History, Trash2, CheckCircle, AlertCircle, Wand2, Eye, X } from 'lucide-react';
+import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History, Trash2, CheckCircle, AlertCircle, Wand2, Eye, X, Filter, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateExtraActivity } from '../services/geminiService';
 
@@ -20,7 +20,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   const [activeTab, setActiveTab] = useState<'topics' | 'activities' | 'carometro' | 'official_results'>('topics');
   const [selectedSubject, setSelectedSubject] = useState<Subject>('História');
   const [selectedGrade, setSelectedGrade] = useState('1ª');
-  const [selectedClass, setSelectedClass] = useState('Todas');
+  const [selectedClass, setSelectedClass] = useState('13.01'); // Inicia com a primeira turma da 1ª série
   const [loading, setLoading] = useState(false);
   
   const [myTopicsHistory, setMyTopicsHistory] = useState<any[]>([]);
@@ -76,10 +76,42 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   };
 
   const fetchStudents = async () => {
-    let query = supabase.from('profiles').select('*').eq('role', 'student').eq('grade', selectedGrade);
-    if (selectedClass !== 'Todas') query = query.eq('class_name', selectedClass);
-    const { data } = await query.order('full_name');
-    if (data) setStudents(data.map(u => ({ ...u, fullName: u.full_name, role: u.role as UserRole, avatarUrl: u.avatar_url })));
+    setLoading(true);
+    let query = supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'student')
+      .eq('grade', selectedGrade);
+    
+    if (selectedClass !== 'Todas') {
+      query = query.eq('class_name', selectedClass);
+    }
+    
+    // Ordem alfabética rigorosa conforme solicitado
+    const { data } = await query.order('full_name', { ascending: true });
+    
+    if (data) {
+      setStudents(data.map(u => ({ 
+        ...u, 
+        fullName: u.full_name, 
+        role: u.role as UserRole, 
+        avatarUrl: u.avatar_url 
+      })));
+    } else {
+      setStudents([]);
+    }
+    setLoading(false);
+  };
+
+  const handleGradeChange = (grade: string) => {
+    setSelectedGrade(grade);
+    // Ao mudar a série, seleciona automaticamente a primeira turma daquela série
+    const availableClasses = CLASSES_BY_GRADE[grade] || [];
+    if (availableClasses.length > 0) {
+      setSelectedClass(availableClasses[0]);
+    } else {
+      setSelectedClass('Todas');
+    }
   };
 
   const handleSaveTopic = async () => {
@@ -160,7 +192,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                 <select className="px-4 py-3 bg-slate-50 border rounded-xl font-bold" value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value as Subject)}>
                   <option>História</option><option>Filosofia</option><option>Geografia</option><option>Sociologia</option>
                 </select>
-                <select className="px-4 py-3 bg-slate-50 border rounded-xl font-bold" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
+                <select className="px-4 py-3 bg-slate-50 border rounded-xl font-bold" value={selectedGrade} onChange={(e) => handleGradeChange(e.target.value)}>
                   <option>1ª</option><option>2ª</option><option>3ª</option>
                 </select>
               </div>
@@ -244,7 +276,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                     <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value as Subject)}>
                         <option>História</option><option>Filosofia</option><option>Geografia</option><option>Sociologia</option>
                     </select>
-                    <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
+                    <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedGrade} onChange={(e) => handleGradeChange(e.target.value)}>
                         <option>1ª</option><option>2ª</option><option>3ª</option>
                     </select>
                     <select className="px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
@@ -328,24 +360,84 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
         )}
 
         {activeTab === 'carometro' && (
-           <div className="space-y-8">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-b pb-6">
-              <h3 className="font-bold text-slate-800 text-2xl">Carômetro Escolar</h3>
-              <div className="flex gap-3">
-                <select className="px-4 py-2 border rounded-xl font-bold" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}><option>1ª</option><option>2ª</option><option>3ª</option></select>
-                <select className="px-4 py-2 border rounded-xl font-bold" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>{["Todas", ...(CLASSES_BY_GRADE[selectedGrade] || [])].map(c => <option key={c} value={c}>{c}</option>)}</select>
+           <div className="space-y-8 animate-fade-in">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-b pb-8">
+              <div>
+                <h3 className="font-black text-slate-800 text-3xl tracking-tighter">Carômetro Escolar</h3>
+                <p className="text-slate-500 text-sm">Visualização de estudantes por turma em ordem alfabética.</p>
+              </div>
+              <div className="flex bg-slate-100 p-2 rounded-[24px] gap-2">
+                <div className="flex items-center gap-2 px-3">
+                  <Filter size={16} className="text-slate-400"/>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtros</span>
+                </div>
+                <select 
+                  className="px-4 py-2 bg-white border-none rounded-xl font-bold text-sm shadow-sm outline-none focus:ring-2 focus:ring-blue-500" 
+                  value={selectedGrade} 
+                  onChange={(e) => handleGradeChange(e.target.value)}
+                >
+                  <option>1ª</option>
+                  <option>2ª</option>
+                  <option>3ª</option>
+                </select>
+                <select 
+                  className="px-4 py-2 bg-white border-none rounded-xl font-bold text-sm shadow-sm outline-none focus:ring-2 focus:ring-blue-500" 
+                  value={selectedClass} 
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                >
+                  <option value="Todas">Todas as Turmas</option>
+                  {(CLASSES_BY_GRADE[selectedGrade] || []).map(c => <option key={c} value={c}>Turma {c}</option>)}
+                </select>
+                <button 
+                  onClick={fetchStudents} 
+                  className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-100"
+                >
+                  <RefreshCw size={18} className={loading ? 'animate-spin' : ''}/>
+                </button>
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-6">
-              {students.map(s => (
-                <div key={s.id} className="text-center group">
-                  <div className="aspect-[4/5] bg-slate-100 rounded-2xl overflow-hidden mb-2 border-2 border-transparent group-hover:border-blue-500 transition-all">
-                    {s.avatarUrl ? <img src={s.avatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full flex items-center justify-center text-slate-300"><Users size={32}/></div>}
+
+            {loading ? (
+              <div className="py-20 flex flex-col items-center justify-center text-slate-400 gap-4">
+                <Loader2 size={48} className="animate-spin text-blue-500"/>
+                <p className="font-bold animate-pulse">Carregando estudantes...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                {students.map(s => (
+                  <div key={s.id} className="text-center group animate-fade-in">
+                    <div className="relative aspect-[4/5] bg-white rounded-[32px] overflow-hidden mb-3 border-2 border-slate-100 group-hover:border-blue-500 group-hover:shadow-2xl transition-all duration-300">
+                      {s.avatarUrl ? (
+                        <img src={s.avatarUrl} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={s.fullName}/>
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-slate-50 text-slate-200">
+                          <Users size={48} strokeWidth={1}/>
+                        </div>
+                      )}
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="bg-blue-600 text-white text-[8px] font-black uppercase px-3 py-1 rounded-full shadow-lg">
+                          {s.className}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs font-black text-slate-800 leading-tight px-2 group-hover:text-blue-600 transition-colors uppercase tracking-tight">
+                      {s.fullName}
+                    </p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">
+                      {s.grade} Série • Turma {s.className}
+                    </p>
                   </div>
-                  <p className="text-sm font-bold text-slate-800 leading-tight">{s.fullName}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+                
+                {students.length === 0 && (
+                  <div className="col-span-full py-24 text-center border-4 border-dashed border-slate-100 rounded-[40px] bg-slate-50/50">
+                    <Users size={64} className="mx-auto text-slate-200 mb-4" strokeWidth={1}/>
+                    <h4 className="text-slate-400 font-black uppercase tracking-widest text-sm">Nenhum estudante nesta turma</h4>
+                    <p className="text-slate-300 text-xs mt-2">Os alunos aparecerão aqui após realizarem o cadastro biométrico.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
