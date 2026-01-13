@@ -101,19 +101,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
       .eq('id', userId);
     
     if (!error) {
-      alert(currentStatus ? "Usuário desbloqueado com sucesso!" : "Usuário bloqueado!");
+      alert(currentStatus ? "Usuário desbloqueado!" : "Usuário bloqueado!");
       fetchUsers();
     }
   };
 
   const deleteUser = async (userId: string) => {
-    if (!confirm("TEM CERTEZA? Isso excluirá permanentemente este usuário.")) return;
+    if (!confirm("Isso excluirá permanentemente este usuário. Continuar?")) return;
     const { error } = await supabase.from('profiles').delete().eq('id', userId);
     if (!error) {
       alert("Usuário removido.");
       fetchUsers();
-    } else {
-      alert("Erro ao excluir: " + error.message);
     }
   };
 
@@ -141,10 +139,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
   };
 
   const handleDeleteTopic = async (topicId: string) => {
-    if (!confirm("Deseja realmente excluir este planejamento?")) return;
+    if (!confirm("Deseja excluir este planejamento?")) return;
     const { error } = await supabase.from('topics').delete().eq('id', topicId);
     if (!error) {
-      alert("Planejamento excluído!");
+      alert("Excluído!");
       fetchAllTopics();
     }
   };
@@ -156,14 +154,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
       id: 1,
       active_quarter: updated.activeQuarter,
       locks: updated.isAssessmentLocked,
-      release_dates: updated.release_dates
+      release_dates: updated.releaseDates
     });
     
     if (!error) {
       setSettings(updated as GlobalSettings);
-      alert("Configurações atualizadas!");
+      alert("Atualizado!");
     } else {
-      alert("Erro ao salvar configurações.");
+      alert("Erro ao salvar. Verifique a aba Ajuda SQL.");
     }
     setLoading(false);
   };
@@ -183,7 +181,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
         .maybeSingle();
 
       if (!topics) {
-        alert(`Não existe planejamento para ${subject}.`);
+        alert(`Não há planejamento para ${subject} nesta série.`);
         return;
       }
 
@@ -193,13 +191,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
       }, { onConflict: 'subject,grade,quarter' });
 
       if (error) throw error;
-      alert(`Prova pronta!`);
+      alert(`Prova oficial gerada com sucesso!`);
     } catch (err: any) {
       alert(err.message);
     } finally {
       setGenLoading(null);
     }
   };
+
+  const SQL_CODE = `-- SCRIPT DE REPARAÇÃO
+CREATE TABLE IF NOT EXISTS official_exams (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject TEXT NOT NULL,
+    grade TEXT NOT NULL,
+    quarter INTEGER NOT NULL,
+    questions JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(subject, grade, quarter)
+);
+
+CREATE TABLE IF NOT EXISTS global_settings (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    active_quarter INTEGER DEFAULT 1,
+    locks JSONB DEFAULT '{"1": false, "2": true, "3": true, "4": true}',
+    release_dates JSONB DEFAULT '{"1": "", "2": "", "3": "", "4": ""}'
+);
+
+ALTER TABLE official_exams DISABLE ROW LEVEL SECURITY;
+ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
 
   const filteredUsers = usersList.filter(u => 
     (u.fullName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -208,11 +227,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
 
   return (
     <div className="space-y-6">
-      {/* Botão de Cadastro Principal sempre no topo para o Admin */}
       <div className="bg-blue-600 p-8 rounded-[40px] text-white flex flex-col sm:flex-row justify-between items-center gap-6 shadow-xl no-print">
         <div>
           <h2 className="text-3xl font-black tracking-tighter">Painel de Administração</h2>
-          <p className="text-blue-100 font-bold uppercase tracking-widest text-xs">Gestão da Escola Frederico José Pedreira</p>
+          <p className="text-blue-100 font-bold uppercase tracking-widest text-xs">Escola Estadual Frederico José Pedreira</p>
         </div>
         <button 
           onClick={() => {
@@ -226,23 +244,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-2 no-print">
-        <button onClick={() => setActiveTab('users')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'users' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Users size={18}/> Todos Usuários</button>
+        <button onClick={() => setActiveTab('users')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'users' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Users size={18}/> Usuários</button>
         <button onClick={() => setActiveTab('topics')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'topics' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><BookOpen size={18}/> Planejamentos</button>
         <button onClick={() => setActiveTab('assessments')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'assessments' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Calendar size={18}/> Calendário</button>
         <button onClick={() => setActiveTab('official_exams')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'official_exams' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Sparkles size={18}/> Gerar Provas</button>
+        <button onClick={() => setActiveTab('sql_help')} className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${activeTab === 'sql_help' ? 'bg-amber-600 text-white shadow-lg' : 'bg-white border text-slate-500'}`}><Database size={18}/> Ajuda SQL</button>
       </div>
 
       <div className="bg-white rounded-[40px] shadow-sm border border-slate-200 p-8">
         {activeTab === 'users' && (
           <div className="space-y-6 animate-fade-in">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b pb-6">
-              <h3 className="text-2xl font-black text-slate-800 tracking-tighter">Lista Geral</h3>
+              <h3 className="text-2xl font-black text-slate-800 tracking-tighter">Gestão de Equipe e Alunos</h3>
               <div className="flex flex-1 justify-end gap-3 w-full md:w-auto">
                 <div className="relative flex-1 md:max-w-xs">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
                   <input 
                     type="text" 
-                    placeholder="Filtrar..."
+                    placeholder="Filtrar por nome..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
@@ -280,6 +299,83 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'topics' && (
+          <div className="space-y-6 animate-fade-in">
+            <h3 className="font-black text-slate-800 text-2xl tracking-tighter">Planejamentos Recebidos</h3>
+            <div className="grid grid-cols-1 gap-4">
+              {allTopics.map((t) => (
+                <div key={t.id} className="p-6 border border-slate-100 rounded-[32px] bg-slate-50/50 flex justify-between items-start hover:shadow-md transition-all">
+                  <div className="flex-1">
+                    <div className="flex gap-2 mb-3">
+                      <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 rounded-full uppercase tracking-widest">{t.subject}</span>
+                      <span className="text-[10px] font-black bg-white border border-slate-200 text-slate-500 px-3 py-1 rounded-full uppercase tracking-widest">{t.grade} SÉRIE</span>
+                    </div>
+                    <p className="font-bold text-slate-800 mb-1">Prof. {t.profiles?.full_name}</p>
+                    <p className="text-slate-600 text-sm leading-relaxed italic">"{t.content}"</p>
+                  </div>
+                  <button onClick={() => handleDeleteTopic(t.id)} className="text-slate-300 hover:text-red-500 p-3 transition-colors">
+                    <Trash2 size={20}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'assessments' && (
+          <div className="space-y-8 max-w-2xl mx-auto animate-fade-in">
+            <div className="text-center">
+              <h3 className="text-3xl font-black text-slate-800 tracking-tighter">Calendário Letivo</h3>
+              <p className="text-slate-500 mt-2">Ative o bimestre e defina as datas de liberação.</p>
+            </div>
+            <div className="grid grid-cols-4 gap-3 bg-slate-50 p-4 rounded-3xl">
+              {[1, 2, 3, 4].map(q => (
+                <button key={q} onClick={() => updateGlobalSettings({ activeQuarter: q })} className={`py-5 rounded-[24px] font-black border-2 transition-all ${settings.activeQuarter === q ? 'bg-blue-600 border-blue-600 text-white shadow-xl scale-105' : 'bg-white border-white text-slate-300'}`}>{q}º Bim</button>
+              ))}
+            </div>
+            <div className="space-y-4">
+              {[1, 2, 3, 4].map(q => (
+                <div key={q} className={`p-5 bg-white border rounded-[32px] flex flex-col md:flex-row justify-between items-center gap-4 ${settings.activeQuarter === q ? 'ring-2 ring-blue-500' : 'opacity-60'}`}>
+                  <p className="font-black text-slate-800 uppercase tracking-widest">{q}º Bimestre</p>
+                  <input type="date" className="bg-slate-50 p-3 rounded-2xl font-bold text-slate-600" value={settings.releaseDates[q] || ''} onChange={(e) => updateGlobalSettings({ releaseDates: { ...settings.releaseDates, [q]: e.target.value } })} />
+                  <button onClick={() => updateGlobalSettings({ isAssessmentLocked: { ...settings.isAssessmentLocked, [q]: !settings.isAssessmentLocked[q] } })} className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 ${settings.isAssessmentLocked[q] ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                    {settings.isAssessmentLocked[q] ? <Lock size={14}/> : <Unlock size={14}/>} {settings.isAssessmentLocked[q] ? 'Bloqueado' : 'Aberto'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'official_exams' && (
+          <div className="animate-fade-in space-y-8 text-center">
+            <h3 className="text-3xl font-black text-slate-800 tracking-tighter">Gerador de Provas Bimestrais</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {['História', 'Filosofia', 'Geografia', 'Sociologia'].map(subj => (
+                <div key={subj} className="p-8 border-2 border-slate-50 rounded-[40px] bg-slate-50/50 space-y-4">
+                  <h4 className="font-black uppercase text-slate-400 text-[11px] tracking-widest">{subj}</h4>
+                  {['1ª', '2ª', '3ª'].map(grade => (
+                    <button key={grade} onClick={() => generateBimonthlyExam(subj as Subject, grade)} disabled={!!genLoading} className="w-full flex justify-between items-center p-4 bg-white border rounded-3xl font-black text-sm hover:border-blue-500 transition-all">
+                      {grade} Série {genLoading === `${subj}-${grade}` ? <Loader2 size={18} className="animate-spin"/> : <Sparkles size={18}/>}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'sql_help' && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl flex gap-4 text-amber-800">
+              <AlertCircle size={32} />
+              <div><h3 className="font-bold">Reparação de Banco</h3><p className="text-sm">Execute no SQL Editor do Supabase se o sistema falhar.</p></div>
+            </div>
+            <pre className="bg-slate-900 text-slate-100 p-6 rounded-2xl overflow-x-auto text-xs font-mono">{SQL_CODE}</pre>
+            <button onClick={() => { navigator.clipboard.writeText(SQL_CODE); alert("Copiado!"); }} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-2"><Copy size={18}/> COPIAR CÓDIGO</button>
           </div>
         )}
 
