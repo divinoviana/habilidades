@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { UserRole, UserProfile, GlobalSettings } from './types.ts';
-import Login from './components/Login.tsx';
-import Register from './components/Register.tsx';
-import AdminDashboard from './components/AdminDashboard.tsx';
-import TeacherDashboard from './components/TeacherDashboard.tsx';
-import StudentDashboard from './components/StudentDashboard.tsx';
+import { UserRole, UserProfile, GlobalSettings } from './types';
+import Login from './components/Login';
+import Register from './components/Register';
+import AdminDashboard from './components/AdminDashboard';
+import TeacherDashboard from './components/TeacherDashboard';
+import StudentDashboard from './components/StudentDashboard';
 import { LogOut, GraduationCap } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -55,7 +55,7 @@ const App: React.FC = () => {
         <div className="flex items-center gap-4">
           <div className="hidden md:block text-right">
             <p className="text-sm font-medium text-slate-700">{currentUser.fullName}</p>
-            <p className="text-xs text-slate-400 capitalize">{currentUser.role === 'admin' ? 'Administrador' : currentUser.role === 'teacher' ? 'Professor' : `Estudante - ${currentUser.grade} ${currentUser.className}`}</p>
+            <p className="text-xs text-slate-400 capitalize">{currentUser.role === UserRole.ADMIN ? 'Administrador' : currentUser.role === UserRole.TEACHER ? 'Professor' : `Estudante - ${currentUser.grade} ${currentUser.className}`}</p>
           </div>
           <button 
             onClick={handleLogout}
@@ -80,7 +80,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="bg-white border-t border-slate-200 p-4 text-center text-slate-400 text-xs">
-        &copy; 2024 SEDUC - Tocantins | Escola Estadual Frederico José Pedreira. Desenvolvido para Excelência Educacional.
+        &copy; 2024 SEDUC - Tocantins | Escola Estadual Frederico José Pedreira.
       </footer>
     </div>
   );

@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { UserProfile, UserRole } from '../types.ts';
+import { UserProfile, UserRole } from '../types';
 import { LogIn, UserPlus, GraduationCap, Loader2, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase.ts';
+import { supabase } from '../lib/supabase';
 
 interface LoginProps {
   onLogin: (user: UserProfile) => void;
@@ -31,11 +31,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
       if (dbError) throw dbError;
 
       if (!data) {
-        throw new Error('E-mail ou senha incorretos. Verifique se o SQL do banco foi executado.');
+        throw new Error('Credenciais incorretas.');
       }
 
       if (data.cheating_locked) {
-        throw new Error('Seu acesso está bloqueado por excesso de tentativas de cola.');
+        throw new Error('Acesso bloqueado.');
       }
 
       const user: UserProfile = {
@@ -59,65 +59,26 @@ const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-700 via-indigo-600 to-slate-900 p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-fade-in border border-white/10">
-        <div className="p-8">
-          <div className="flex justify-center mb-6">
-            <div className="bg-blue-600 p-4 rounded-2xl shadow-xl shadow-blue-200">
-              <GraduationCap size={40} className="text-white" />
-            </div>
-          </div>
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-slate-800">Escola Estadual Frederico José Pedreira</h2>
-            <p className="text-slate-500 text-sm font-medium uppercase tracking-wider">Sistema de Avaliação Inteligente</p>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">E-mail de Acesso</label>
-              <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none"
-                placeholder="seu@email.com"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Sua Senha</label>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all outline-none"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-            {error && (
-              <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-sm font-medium flex gap-3 animate-in fade-in slide-in-from-top-2">
-                <AlertCircle size={20} className="shrink-0" />
-                {error}
-              </div>
-            )}
-            <button 
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200 flex items-center justify-center gap-2 transition-all transform active:scale-[0.98] disabled:bg-slate-300 disabled:shadow-none"
-            >
-              {loading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
-              Acessar Painel
-            </button>
-          </form>
-          <div className="mt-8 pt-8 border-t border-slate-100 text-center">
-            <button 
-              onClick={onGoToRegister}
-              className="text-blue-600 font-bold hover:text-blue-800 transition-colors flex items-center justify-center gap-2 mx-auto"
-            >
-              <UserPlus size={18} /> Novo por aqui? Criar Cadastro
-            </button>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-700 to-slate-900 p-4">
+      <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden p-10 space-y-8 animate-fade-in">
+        <div className="flex justify-center">
+          <div className="bg-blue-600 p-4 rounded-3xl shadow-xl shadow-blue-100">
+            <GraduationCap size={48} className="text-white" />
           </div>
         </div>
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-black text-slate-800 tracking-tighter leading-none">Frederico José Pedreira</h2>
+          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Sistema de Avaliação em Ciências Humanas</p>
+        </div>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="E-mail"/>
+          <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="Senha"/>
+          {error && <div className="text-red-500 text-xs font-bold text-center px-4 py-2 bg-red-50 rounded-xl">{error}</div>}
+          <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white font-black py-5 rounded-[24px] shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all flex justify-center items-center gap-2">
+            {loading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />} Acessar Painel
+          </button>
+        </form>
+        <button onClick={onGoToRegister} className="w-full text-slate-400 font-bold text-xs uppercase hover:text-blue-600 transition-colors">Novo Aluno? Criar Biometria</button>
       </div>
     </div>
   );

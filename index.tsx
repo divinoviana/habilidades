@@ -1,9 +1,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.tsx';
-
-// The Gemini SDK will find the API_KEY from process.env.API_KEY which is assumed to be pre-configured.
+import App from './App';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
