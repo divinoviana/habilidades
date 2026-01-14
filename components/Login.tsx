@@ -38,6 +38,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
         throw new Error('Acesso bloqueado por tentativas de fraude.');
       }
 
+      // Mapping database fields to UserProfile interface
+      // Note: we convert single 'subject' or array 'subjects' from DB to 'subjects' array
       const user: UserProfile = {
         id: data.id,
         email: data.email,
@@ -48,7 +50,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onGoToRegister }) => {
         phone: data.phone,
         avatarUrl: data.avatar_url,
         cheatingLocked: data.cheating_locked,
-        subject: data.subject as Subject
+        subjects: data.subjects || (data.subject ? [data.subject as Subject] : [])
       };
 
       onLogin(user);

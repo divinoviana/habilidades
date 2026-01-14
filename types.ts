@@ -17,7 +17,7 @@ export interface UserProfile {
   phone?: string;
   avatarUrl?: string;
   cheatingLocked?: boolean;
-  subject?: Subject; // Disciplina vinculada (para professores)
+  subjects?: Subject[]; // Lista de disciplinas vinculadas (para professores)
 }
 
 export interface Question {
