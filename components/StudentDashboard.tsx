@@ -15,33 +15,18 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
   const [session, setSession] = useState<{ active: boolean; subject?: Subject; isMock: boolean }>({ active: false, isMock: false });
   const [activeQuestions, setActiveQuestions] = useState<Question[]>([]);
   
-  const [extraSession, setExtraSession] = useState<ExtraActivity | null>(null);
-  const [extraAnswers, setExtraAnswers] = useState<any[]>([]);
-  const [submittingExtra, setSubmittingExtra] = useState(false);
-  
   const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [pendingExtras, setPendingExtras] = useState<ExtraActivity[]>([]);
   const [loadingSubject, setLoadingSubject] = useState<string | null>(null);
 
   const subjects: Subject[] = ['História', 'Filosofia', 'Geografia', 'Sociologia'];
 
   useEffect(() => {
     fetchAssessments();
-    fetchPendingExtras();
   }, [currentUser.id]);
 
   const fetchAssessments = async () => {
     const { data } = await supabase.from('assessments').select('*').eq('student_id', currentUser.id).order('created_at', { ascending: false });
     if (data) setAssessments(data.map(d => ({ ...d, studentId: d.student_id, isMock: d.is_mock, cheatingAttempts: d.cheating_attempts, createdAt: d.created_at })));
-  };
-
-  const fetchPendingExtras = async () => {
-    const { data } = await supabase.from('extra_activities').select('*').eq('grade', currentUser.grade).or(`class_name.is.null,class_name.eq.${currentUser.className}`).order('created_at', { ascending: false });
-    if (data) {
-      const { data: done } = await supabase.from('activity_submissions').select('activity_id').eq('student_id', currentUser.id);
-      const doneIds = done?.map(d => d.activity_id) || [];
-      setPendingExtras(data.filter(act => !doneIds.includes(act.id)).map(act => ({ ...act, teacherId: act.teacher_id, createdAt: act.created_at })));
-    }
   };
 
   const handleStartOfficial = async (subject: Subject) => {
@@ -56,9 +41,11 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
         setActiveQuestions(data.questions);
         setSession({ active: true, subject, isMock: false });
       } else {
-        alert("Esta prova ainda não foi cadastrada pelos professores.");
+        alert("Atenção: Esta prova ainda não foi gerada pela coordenação para este bimestre.");
       }
-    } catch (e: any) { alert("Erro ao carregar prova."); }
+    } catch (e: any) { 
+      alert("Erro de conexão ao carregar a prova. Verifique sua internet."); 
+    }
     setLoadingSubject(null);
   };
 
@@ -66,14 +53,23 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
     setLoadingSubject(`mock-${subject}`);
     try {
       const { data } = await supabase.from('topics').select('content').eq('subject', subject).eq('grade', currentUser.grade).eq('quarter', settings.activeQuarter).order('created_at', { ascending: false }).limit(1).maybeSingle();
-      if (data) {
-        const qs = await generateEnemAssessment(subject, data.content, currentUser.grade || '1ª');
-        if (qs && qs.length > 0) {
-          setActiveQuestions(qs);
-          setSession({ active: true, subject, isMock: true });
-        } else alert("Não foi possível gerar questões. Tente novamente.");
-      } else alert("Sem planejamento cadastrado para gerar simulado.");
-    } catch (err: any) { alert("Erro ao gerar simulado."); }
+      
+      if (!data || !data.content) {
+        alert(`Não há conteúdo de planejamento cadastrado para ${subject} no ${settings.activeQuarter}º bimestre para gerar o simulado.`);
+        setLoadingSubject(null);
+        return;
+      }
+
+      const qs = await generateEnemAssessment(subject, data.content, currentUser.grade || '1ª');
+      if (qs && qs.length > 0) {
+        setActiveQuestions(qs);
+        setSession({ active: true, subject, isMock: true });
+      } else {
+        alert("A IA Frederico não conseguiu formatar as questões agora. Por favor, tente novamente em instantes.");
+      }
+    } catch (err: any) { 
+      alert("Erro ao gerar simulado: " + err.message); 
+    }
     setLoadingSubject(null);
   };
 

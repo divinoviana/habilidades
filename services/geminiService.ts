@@ -6,6 +6,14 @@ const getAI = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
 };
 
+const SYSTEM_INSTRUCTION = `Aja como um especialista em elaboração de itens do ENEM para a área de Ciências Humanas da Escola Estadual Frederico José Pedreira.
+Siga rigorosamente estas regras:
+1. Gere EXATAMENTE 5 questões de múltipla escolha (A-E).
+2. Cada questão DEVE ter um "citation" (Texto-base denso, fragmento de obra clássica ou documento histórico).
+3. O comando da questão DEVE exigir análise do texto.
+4. NUNCA mencione imagens, gráficos ou tabelas.
+5. Retorne APENAS o JSON puro, sem markdown ou textos extras.`;
+
 export async function generateEnemAssessment(
   subject: Subject,
   topics: string,
@@ -13,31 +21,12 @@ export async function generateEnemAssessment(
 ): Promise<Question[]> {
   try {
     const ai = getAI();
-    const prompt = `Aja como um especialista em elaboração de itens do ENEM para a área de Ciências Humanas da Escola Estadual Frederico José Pedreira.
-    Gere uma avaliação oficial para ${subject} (${grade} série) focada rigorosamente no planejamento: "${topics}".
-    
-    REQUISITOS OBRIGATÓRIOS:
-    1. Gere exatamente 5 questões de múltipla escolha com 5 alternativas (A-E) cada.
-    2. Cada questão DEVE obrigatoriamente ter um "citation" (Texto-base: fragmento de obra clássica, artigo científico, documento histórico ou notícia relevante). O texto deve ser denso e permitir análise.
-    3. O comando da questão deve exigir obrigatoriamente a interpretação ou associação com o texto-base fornecido.
-    4. Não mencione imagens, gráficos ou tabelas, foque 100% na análise textual.
-    5. Distribua as dificuldades entre easy, medium e hard.
-
-    RETORNE UM ARRAY JSON DE OBJETOS COM ESTA ESTRUTURA:
-    [{
-      "id": "string_uuid",
-      "citation": "texto_base_completo",
-      "text": "comando_da_pergunta",
-      "options": ["Alternativa A", "Alternativa B", "Alternativa C", "Alternativa D", "Alternativa E"],
-      "correctIndex": 0-4,
-      "explanation": "justificativa_pedagogica_da_resposta",
-      "difficulty": "easy|medium|hard"
-    }]`;
-
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: prompt,
+      contents: `Gere uma avaliação de ${subject} para a ${grade} série baseada neste planejamento: "${topics}".`,
       config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        thinkingConfig: { thinkingBudget: 0 }, // Velocidade máxima
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -58,10 +47,16 @@ export async function generateEnemAssessment(
       }
     });
 
-    const parsed = JSON.parse(response.text || "[]");
+    const text = response.text;
+    if (!text) throw new Error("A IA retornou uma resposta vazia.");
+    
+    const parsed = JSON.parse(text);
+    if (!Array.isArray(parsed) || parsed.length === 0) throw new Error("A IA não gerou o formato de questões esperado.");
+    
     return parsed.slice(0, 5);
   } catch (error: any) {
-    throw new Error("Falha ao gerar avaliação: " + error.message);
+    console.error("Erro Gemini:", error);
+    throw new Error(error.message || "Falha na comunicação com o servidor de IA.");
   }
 }
 
@@ -72,27 +67,12 @@ export async function generateExtraActivity(
 ) {
   try {
     const ai = getAI();
-    const prompt = `Crie uma Atividade Extra de ${subject} (${grade} série) sobre o tema: "${theme}".
-    
-    REQUISITOS:
-    1. Gere 5 questões mesclando múltipla escolha e abertas.
-    2. Use citações textuais (citation) ricas em conteúdo histórico/filosófico para cada questão.
-    3. Foque na análise crítica do texto. Não utilize referências visuais.
-    
-    FORMATO JSON ESTRITO:
-    [{ 
-      "id": "string",
-      "citation": "texto base rico",
-      "question": "comando interpretativo", 
-      "type": "multiple" ou "open", 
-      "options": ["opção A", "opção B", "opção C", "opção D"], 
-      "correctAnswer": 0 
-    }]`;
-
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: prompt,
+      contents: `Crie uma atividade de ${subject} (${grade} série) sobre: "${theme}". Misture questões abertas e fechadas.`,
       config: {
+        systemInstruction: `Crie uma atividade escolar com 5 questões. Use citações textuais densas. Não use imagens. Retorne JSON estruturado.`,
+        thinkingConfig: { thinkingBudget: 0 },
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -112,10 +92,11 @@ export async function generateExtraActivity(
       }
     });
 
-    const parsed = JSON.parse(response.text || "[]");
-    return parsed.slice(0, 5);
+    const text = response.text;
+    if (!text) throw new Error("Sem resposta da IA.");
+    return JSON.parse(text).slice(0, 5);
   } catch (error: any) {
-    throw new Error("Erro Gemini (Atividade): " + error.message);
+    throw new Error("Erro ao gerar atividade: " + error.message);
   }
 }
 
@@ -125,11 +106,15 @@ export async function evaluateActivitySubmission(
 ): Promise<{ score: number; feedback: string }> {
   try {
     const ai = getAI();
-    const prompt = `Aja como professor de Ciências Humanas. Corrija a atividade: ${JSON.stringify(activity)}. Respostas enviadas pelo aluno: ${JSON.stringify(studentAnswers)}. Avalie o domínio do conteúdo e a capacidade de interpretação. Retorne JSON: { "score": 0-10, "feedback": "texto explicativo" }`;
+    const prompt = `Corrija: ${JSON.stringify(activity)}. Respostas: ${JSON.stringify(studentAnswers)}.`;
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
-      config: { responseMimeType: "application/json" }
+      config: { 
+        systemInstruction: 'Aja como professor de Humanas. Dê nota 0-10 e feedback analítico em JSON.',
+        thinkingConfig: { thinkingBudget: 0 },
+        responseMimeType: "application/json" 
+      }
     });
     return JSON.parse(response.text || '{"score":0,"feedback":"Erro na correção."}');
   } catch (error) {
@@ -144,8 +129,15 @@ export async function generateAIFeedback(
 ): Promise<string> {
   try {
     const ai = getAI();
-    const prompt = `Gere um feedback pedagógico motivador e analítico para um aluno de ${subject}. Analise o desempenho baseado nestas questões: ${JSON.stringify(questions)} e nestas respostas: ${JSON.stringify(answers)}. Foque em pontos de melhoria na interpretação de textos.`;
-    const response = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
+    const prompt = `Analise: ${JSON.stringify(questions)} | Respostas: ${JSON.stringify(answers)}.`;
+    const response = await ai.models.generateContent({ 
+      model: "gemini-3-flash-preview", 
+      contents: prompt,
+      config: {
+        systemInstruction: `Gere um feedback motivador focado em interpretação de texto para o aluno de ${subject}. Seja breve e direto.`,
+        thinkingConfig: { thinkingBudget: 0 }
+      }
+    });
     return response.text || "Continue estudando seus textos base!";
   } catch (error) {
     return "Feedback indisponível no momento.";

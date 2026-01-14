@@ -180,11 +180,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
     setGenLoading(loaderKey);
     try {
       const { data: topics } = await supabase.from('topics').select('content').eq('subject', subject).eq('grade', grade).eq('quarter', settings.activeQuarter).order('created_at', { ascending: false }).limit(1).maybeSingle();
-      if (!topics) { alert(`Sem planejamento para ${subject} - ${grade}.`); return; }
+      
+      if (!topics || !topics.content) { 
+        alert(`Impossível gerar: O professor de ${subject} ainda não enviou o planejamento para a ${grade} série neste bimestre.`); 
+        setGenLoading(null);
+        return; 
+      }
+
       const questions = await generateEnemAssessment(subject, topics.content, grade);
-      await supabase.from('official_exams').upsert({ subject, grade, quarter: settings.activeQuarter, questions }, { onConflict: 'subject,grade,quarter' });
-      alert(`Prova Oficial Gerada com Sucesso!`);
-    } catch (err: any) { alert(err.message); } finally { setGenLoading(null); }
+      
+      if (!questions || questions.length === 0) {
+        throw new Error("A IA gerou uma prova vazia ou inválida. Tente novamente.");
+      }
+
+      const { error } = await supabase.from('official_exams').upsert({ 
+        subject, 
+        grade, 
+        quarter: settings.activeQuarter, 
+        questions 
+      }, { onConflict: 'subject,grade,quarter' });
+
+      if (error) throw error;
+      
+      alert(`Prova Oficial de ${subject} (${grade} série) gerada com sucesso e liberada para os alunos!`);
+    } catch (err: any) { 
+      alert("Erro na Geração: " + err.message); 
+    } finally { 
+      setGenLoading(null); 
+    }
   };
 
   const SQL_CODE = `-- MASTER SCRIPT FREDERICO - SUPORTE MÚLTIPLAS DISCIPLINAS
