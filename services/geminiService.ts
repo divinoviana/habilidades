@@ -3,7 +3,11 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Question, Subject } from "../types";
 
 const getAI = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API_KEY não configurada no ambiente.");
+  }
+  return new GoogleGenAI({ apiKey });
 };
 
 const ASSESSMENT_SYSTEM_INSTRUCTION = `Aja como um especialista em elaboração de itens do ENEM para a área de Ciências Humanas da Escola Estadual Frederico José Pedreira.
