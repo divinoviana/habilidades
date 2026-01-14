@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, GlobalSettings, UserRole, Subject, Topic } from '../types';
-// Added missing GraduationCap import
-import { Users, Lock, Unlock, Calendar, Trash2, ShieldAlert, KeyRound, Loader2, RefreshCw, Sparkles, Wand2, ChevronLeft, AlertCircle, BookOpen, Clock, Database, Copy, Search, UserCheck, UserMinus, UserPlus, X, Mail, Shield, Briefcase, CheckCircle2, User as UserIcon, Plus, GraduationCap } from 'lucide-react';
+import { Users, Lock, Unlock, Calendar, Trash2, ShieldAlert, KeyRound, Loader2, RefreshCw, Sparkles, Wand2, ChevronLeft, AlertCircle, BookOpen, Clock, Database, Copy, Search, UserCheck, UserMinus, UserPlus, X, Mail, Shield, Briefcase, CheckCircle2, User as UserIcon, Plus, GraduationCap, Book } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateEnemAssessment } from '../services/geminiService';
 
@@ -17,6 +16,8 @@ const CLASSES_MAP: { [key: string]: string[] } = {
   "2ª": ["23.01", "23.02", "23.03", "23.04", "23.05", "23.06", "23.07", "23.08"],
   "3ª": ["33.01", "33.02", "33.03", "33.04", "33.05", "33.06", "33.07", "33.08"]
 };
+
+const SUBJECTS: Subject[] = ['História', 'Filosofia', 'Geografia', 'Sociologia'];
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, setSettings }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'official_exams' | 'sql_help'>('users');
@@ -33,7 +34,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
     password: '',
     role: UserRole.STUDENT,
     grade: '1ª',
-    className: '13.01'
+    className: '13.01',
+    subject: SUBJECTS[0]
   });
 
   useEffect(() => {
@@ -53,7 +55,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
         grade: u.grade,
         className: u.class_name,
         avatarUrl: u.avatar_url,
-        cheatingLocked: u.cheating_locked
+        cheatingLocked: u.cheating_locked,
+        subject: u.subject as Subject
       })));
     }
     setLoading(false);
@@ -91,14 +94,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
         password: newUser.password,
         role: newUser.role,
         grade: newUser.role === UserRole.STUDENT ? newUser.grade : null,
-        class_name: newUser.role === UserRole.STUDENT ? newUser.className : null
+        class_name: newUser.role === UserRole.STUDENT ? newUser.className : null,
+        subject: newUser.role === UserRole.TEACHER ? newUser.subject : null
       }]);
 
       if (error) throw error;
       
       alert("Usuário cadastrado com sucesso!");
       setShowAddModal(false);
-      setNewUser({ fullName: '', email: '', password: '', role: UserRole.STUDENT, grade: '1ª', className: '13.01' });
+      setNewUser({ fullName: '', email: '', password: '', role: UserRole.STUDENT, grade: '1ª', className: '13.01', subject: SUBJECTS[0] });
       fetchUsers();
     } catch (err: any) {
       alert("Erro ao cadastrar: " + err.message);
@@ -139,6 +143,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
   };
 
   const SQL_CODE = `-- MASTER SCRIPT FREDERICO - EXECUTE NO SQL EDITOR
+-- ADICIONA COLUNA SUBJECT SE NÃO EXISTIR
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='subject') THEN
+        ALTER TABLE profiles ADD COLUMN subject TEXT;
+    END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT UNIQUE NOT NULL,
@@ -147,6 +159,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     role TEXT NOT NULL DEFAULT 'student',
     grade TEXT,
     class_name TEXT,
+    subject TEXT, -- Nova coluna para vincular professor à disciplina
     phone TEXT,
     avatar_url TEXT,
     cheating_locked BOOLEAN DEFAULT FALSE,
@@ -242,7 +255,6 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header Admin */}
       <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-8 rounded-[40px] text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-2xl no-print relative overflow-hidden">
         <div className="absolute top-0 right-0 p-12 opacity-10"><Shield size={120}/></div>
         <div className="z-10">
@@ -261,7 +273,6 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
         </div>
       </div>
 
-      {/* Navegação de Abas */}
       <div className="flex gap-2 overflow-x-auto pb-2 no-print">
         <button 
           onClick={() => setActiveTab('users')} 
@@ -283,7 +294,6 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
         </button>
       </div>
 
-      {/* Conteúdo Central */}
       <div className="bg-white rounded-[40px] shadow-sm border border-slate-200 p-8 min-h-[500px]">
         {activeTab === 'users' && (
           <div className="space-y-8">
@@ -330,6 +340,9 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
                     {u.role === UserRole.STUDENT && (
                       <p className="text-[10px] text-slate-400 flex items-center gap-2 font-medium"><GraduationCap size={12}/> {u.grade} Série • Turma {u.className}</p>
                     )}
+                    {u.role === UserRole.TEACHER && (
+                      <p className="text-[10px] text-blue-600 flex items-center gap-2 font-black uppercase tracking-widest"><Book size={12}/> Disciplina: {u.subject || 'Não definida'}</p>
+                    )}
                   </div>
 
                   <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -363,7 +376,7 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {['História', 'Filosofia', 'Geografia', 'Sociologia'].map(subj => (
+              {SUBJECTS.map(subj => (
                 <div key={subj} className="p-8 border border-slate-100 rounded-[40px] bg-slate-50/50 space-y-6 flex flex-col">
                   <div className="flex items-center gap-3">
                     <div className="bg-blue-600 p-2 rounded-xl"><BookOpen size={16} className="text-white"/></div>
@@ -482,6 +495,19 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
                     onChange={e => setNewUser({...newUser, password: e.target.value})}
                   />
                 </div>
+
+                {newUser.role === UserRole.TEACHER && (
+                  <div className="space-y-1 animate-fade-in">
+                    <label className="text-[10px] font-black uppercase text-slate-400 ml-4 tracking-widest">Disciplina de Atuação</label>
+                    <select 
+                      className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700"
+                      value={newUser.subject}
+                      onChange={e => setNewUser({...newUser, subject: e.target.value as Subject})}
+                    >
+                      {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                )}
 
                 {newUser.role === UserRole.STUDENT && (
                   <div className="grid grid-cols-2 gap-4 animate-fade-in">
