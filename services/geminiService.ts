@@ -3,10 +3,19 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Question, Subject } from "../types";
 
 const getAI = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API_KEY não configurada no ambiente.");
+  // Obtém a chave e remove possíveis aspas extras ou espaços injetados pelo ambiente
+  let apiKey = process.env.API_KEY;
+  
+  if (typeof apiKey === 'string') {
+    apiKey = apiKey.trim().replace(/^["']|["']$/g, '');
   }
+
+  // Se a chave for a string "undefined" ou "null", ela é inválida (erro comum de build)
+  if (!apiKey || apiKey === 'undefined' || apiKey === 'null' || apiKey.length < 10) {
+    console.error("DEBUG: API_KEY inválida detectada:", apiKey);
+    throw new Error("API_KEY não configurada corretamente no ambiente de deploy (Vercel). Verifique as Environment Variables.");
+  }
+
   return new GoogleGenAI({ apiKey });
 };
 
@@ -64,7 +73,9 @@ export async function generateEnemAssessment(
     return JSON.parse(text).slice(0, 5);
   } catch (error: any) {
     console.error("Erro na Geração de Prova:", error);
-    throw new Error(error.message || "Falha ao comunicar com o servidor de IA.");
+    // Se o erro vier da API do Google, extraímos a mensagem técnica para o usuário
+    const errorMsg = error.message || JSON.stringify(error);
+    throw new Error(errorMsg);
   }
 }
 
