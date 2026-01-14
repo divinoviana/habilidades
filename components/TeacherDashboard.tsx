@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, GlobalSettings, Subject, ExtraActivity, ActivitySubmission, UserRole, Assessment, Question } from '../types';
-import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History, Trash2, CheckCircle, AlertCircle, Wand2, Eye, X, Filter, RefreshCw, MessageSquare, Plus, StickyNote, User, Clock, Search, Quote, Image as ImageIcon, Edit3, Save, Book } from 'lucide-react';
+import { BookOpen, ClipboardList, KeyRound, Loader2, FilePlus, ListChecks, Sparkles, Send, Users, Contact2, Printer, ChevronLeft, FileText, Download, History, Trash2, CheckCircle, AlertCircle, Wand2, Eye, X, Filter, RefreshCw, MessageSquare, Plus, StickyNote, User, Clock, Search, Quote, Edit3, Save, Book } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateExtraActivity } from '../services/geminiService';
 
@@ -26,7 +26,6 @@ const CLASSES_BY_GRADE: { [key: string]: string[] } = {
 
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settings }) => {
   const [activeTab, setActiveTab] = useState<'topics' | 'activities' | 'carometro' | 'official_results'>('topics');
-  // Se o professor tiver disciplina fixa, usa ela, senão permite selecionar (caso seja admin acessando como teacher ou legados)
   const [selectedSubject, setSelectedSubject] = useState<Subject>(currentUser.subject || 'História');
   const [selectedGrade, setSelectedGrade] = useState('1ª');
   const [selectedClass, setSelectedClass] = useState('Todas'); 
@@ -40,14 +39,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   
   const [extraTheme, setExtraTheme] = useState('');
   const [genQuestions, setGenQuestions] = useState<any[] | null>(null);
-  const [viewingActivity, setViewingActivity] = useState<ExtraActivity | null>(null);
   const [submissions, setSubmissions] = useState<ActivitySubmission[]>([]);
 
   const [selectedStudent, setSelectedStudent] = useState<UserProfile | null>(null);
   const [observations, setObservations] = useState<StudentObservation[]>([]);
   const [newObservation, setNewObservation] = useState('');
 
-  // Estados de Edição
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
   const [editTopicContent, setEditTopicContent] = useState('');
   const [newTopic, setNewTopic] = useState('');
@@ -74,7 +71,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
 
   const fetchOfficialResults = async () => {
     setLoading(true);
-    // Resultados filtrados sempre pela disciplina do professor
     let query = supabase
       .from('assessments')
       .select('*, profiles(full_name, class_name)')
@@ -156,7 +152,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
 
   return (
     <div className="space-y-6">
-      {/* Informação da Disciplina do Professor */}
       <div className="bg-slate-900 rounded-[32px] p-6 text-white flex flex-col md:flex-row justify-between items-center gap-4 shadow-xl">
         <div className="flex items-center gap-4">
             <div className="bg-blue-600 p-3 rounded-2xl">
@@ -224,9 +219,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                     <p className="text-xs text-slate-600 italic line-clamp-3 leading-relaxed">"{t.content}"</p>
                   </div>
                 ))}
-                {myTopicsHistory.filter(t => t.subject === selectedSubject).length === 0 && (
-                    <p className="text-center py-10 text-slate-300 italic text-[10px] uppercase">Nenhum planejamento enviado</p>
-                )}
               </div>
             </div>
           </div>
@@ -270,7 +262,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                       <td className="px-6 py-4 text-right"><button onClick={() => setViewingAssessment(res)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Eye size={18}/></button></td>
                     </tr>
                   ))}
-                  {officialResults.length === 0 && <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-300 italic">Nenhum resultado disponível para {selectedSubject} nesta série/turma.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -281,12 +272,12 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-200 space-y-4">
               <h3 className="font-black text-slate-800 text-xl tracking-tighter">Gerar Atividade Extra - {selectedSubject}</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Gera 5 questões (objetivas e discursivas) com IA Frederico</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Gera 5 questões analíticas com IA Frederico</p>
               <div className="space-y-4 pt-2">
                 <select className="w-full px-4 py-3 bg-white border rounded-xl font-bold text-sm" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
                   <option>1ª</option><option>2ª</option><option>3ª</option>
                 </select>
-                <input className="w-full p-4 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tema crítico (ex: Impactos da Revolução Industrial)..." value={extraTheme} onChange={e => setExtraTheme(e.target.value)}/>
+                <input className="w-full p-4 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tema crítico (ex: Ética em Maquiavel)..." value={extraTheme} onChange={e => setExtraTheme(e.target.value)}/>
                 <button onClick={async () => {
                   if(!extraTheme) return;
                   setLoading(true);
@@ -329,9 +320,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                     </div>
                   </div>
                 ))}
-                {myActivities.filter(a => a.subject === selectedSubject).length === 0 && (
-                    <p className="text-center py-10 text-slate-300 italic text-[10px] uppercase">Nenhuma atividade criada em {selectedSubject}</p>
-                )}
               </div>
             </div>
           </div>
@@ -342,7 +330,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[32px] border border-slate-100">
                     <div>
                         <h4 className="font-black text-slate-800 text-lg tracking-tight uppercase">Explorar Estudantes</h4>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Filtre por série e turma para carregar as identidades visuais</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Carregando identidades visuais dos alunos</p>
                     </div>
                     <div className="flex gap-2">
                         <select className="px-3 py-2 bg-white border rounded-xl font-bold text-xs" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
@@ -363,13 +351,11 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                     <p className="text-[10px] font-black uppercase text-slate-700 tracking-tighter line-clamp-1">{s.fullName}</p>
                     </div>
                 ))}
-                {students.length === 0 && <div className="col-span-full py-20 text-center text-slate-300 italic uppercase text-[10px]">Selecione uma turma para carregar o carômetro</div>}
                </div>
            </div>
         )}
       </div>
 
-      {/* MODAL DE VISUALIZAÇÃO DE PROVA */}
       {viewingAssessment && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-4xl rounded-[48px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in">
@@ -427,56 +413,6 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                     )
                   })}
                </div>
-
-               <div className="bg-slate-900 p-10 rounded-[40px] text-white space-y-4 shadow-2xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-8 opacity-10"><Sparkles size={80}/></div>
-                  <h4 className="font-black text-xs uppercase tracking-widest flex items-center gap-2 text-blue-400"><Sparkles size={16}/> Feedback Sistêmico (IA Frederico)</h4>
-                  <p className="text-slate-300 italic text-sm leading-relaxed relative z-10">"{viewingAssessment.feedback}"</p>
-               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedStudent && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 no-print">
-          <div className="bg-white w-full max-w-lg rounded-[48px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in">
-            <div className="p-8 bg-slate-900 text-white flex justify-between items-center shadow-lg">
-              <div className="flex items-center gap-4">
-                 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center font-black">{selectedStudent.fullName[0]}</div>
-                 <div>
-                    <h3 className="font-black uppercase tracking-tighter text-xl">{selectedStudent.fullName}</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedStudent.grade} Série • Turma {selectedStudent.className}</p>
-                 </div>
-              </div>
-              <button onClick={() => setSelectedStudent(null)} className="p-2 hover:bg-white/20 rounded-full transition-colors"><X size={24}/></button>
-            </div>
-            <div className="p-8 overflow-y-auto space-y-8 flex-1">
-              <div className="space-y-4">
-                <h4 className="font-black text-slate-800 uppercase text-[10px] tracking-widest border-b pb-2">Nova Observação</h4>
-                <textarea className="w-full bg-slate-50 border border-slate-100 p-5 rounded-3xl outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]" placeholder="Anote aqui sobre o comportamento ou progresso do aluno..." value={newObservation} onChange={e => setNewObservation(e.target.value)} />
-                <button onClick={async () => {
-                   if (!newObservation.trim()) return;
-                   const { error } = await supabase.from('student_observations').insert([{ student_id: selectedStudent.id, teacher_id: currentUser.id, content: newObservation.trim() }]);
-                   if (!error) { setNewObservation(''); fetchObservations(selectedStudent.id); alert("Anotação salva!"); }
-                }} className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-blue-700 transition-all">Salvar Registro</button>
-              </div>
-              
-              <div className="space-y-4">
-                <h4 className="font-black text-slate-800 uppercase text-[10px] tracking-widest border-b pb-2">Registros Anteriores</h4>
-                <div className="space-y-3">
-                  {observations.map(o => (
-                    <div key={o.id} className="p-5 bg-slate-50 border border-slate-100 rounded-3xl relative group">
-                      <p className="text-sm text-slate-700 italic leading-relaxed">"{o.content}"</p>
-                      <div className="flex justify-between items-center mt-3">
-                         <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{new Date(o.created_at).toLocaleString()}</p>
-                         <button onClick={async () => { if(confirm("Remover anotação?")) { await supabase.from('student_observations').delete().eq('id', o.id); fetchObservations(selectedStudent.id); } }} className="text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
-                      </div>
-                    </div>
-                  ))}
-                  {observations.length === 0 && <p className="text-center py-10 text-slate-300 italic text-[10px] uppercase">Sem registros pedagógicos</p>}
-                </div>
-              </div>
             </div>
           </div>
         </div>

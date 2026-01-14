@@ -27,8 +27,7 @@ export interface Question {
   correctIndex: number;
   explanation: string;
   difficulty: 'easy' | 'medium' | 'hard';
-  citation?: string; // Texto base ou citação
-  visualDescription?: string; // Descrição de gráfico, mapa ou charge
+  citation?: string; // Texto base ou citação textual
 }
 
 export interface ExtraActivity {
@@ -45,7 +44,6 @@ export interface ExtraActivity {
     options?: string[];
     correctAnswer?: string | number;
     citation?: string;
-    visualDescription?: string;
   }[];
   createdAt: string;
 }

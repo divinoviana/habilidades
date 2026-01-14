@@ -18,20 +18,19 @@ export async function generateEnemAssessment(
     
     REQUISITOS OBRIGATÓRIOS:
     1. Gere exatamente 5 questões de múltipla escolha com 5 alternativas (A-E) cada.
-    2. Cada questão DEVE ter um "citation" (Texto-base: fragmento histórico, geográfico, sociológico ou filosófico).
-    3. Pelo menos 2 questões DEVEM ter uma "visualDescription" (Descrição detalhada de charge, mapa ou gráfico).
-    4. O comando deve exigir interpretação do texto-base.
-    5. Distribua dificuldades entre easy, medium e hard.
+    2. Cada questão DEVE obrigatoriamente ter um "citation" (Texto-base: fragmento de obra clássica, artigo científico, documento histórico ou notícia relevante). O texto deve ser denso e permitir análise.
+    3. O comando da questão deve exigir obrigatoriamente a interpretação ou associação com o texto-base fornecido.
+    4. Não mencione imagens, gráficos ou tabelas, foque 100% na análise textual.
+    5. Distribua as dificuldades entre easy, medium e hard.
 
     RETORNE UM ARRAY JSON DE OBJETOS COM ESTA ESTRUTURA:
     [{
       "id": "string_uuid",
-      "citation": "texto_base",
-      "visualDescription": "descricao_opcional_ou_null",
-      "text": "comando_pergunta",
-      "options": ["A", "B", "C", "D", "E"],
+      "citation": "texto_base_completo",
+      "text": "comando_da_pergunta",
+      "options": ["Alternativa A", "Alternativa B", "Alternativa C", "Alternativa D", "Alternativa E"],
       "correctIndex": 0-4,
-      "explanation": "justificativa",
+      "explanation": "justificativa_pedagogica_da_resposta",
       "difficulty": "easy|medium|hard"
     }]`;
 
@@ -47,7 +46,6 @@ export async function generateEnemAssessment(
             properties: {
               id: { type: Type.STRING },
               citation: { type: Type.STRING },
-              visualDescription: { type: Type.STRING, nullable: true },
               text: { type: Type.STRING },
               options: { type: Type.ARRAY, items: { type: Type.STRING } },
               correctIndex: { type: Type.INTEGER },
@@ -74,19 +72,18 @@ export async function generateExtraActivity(
 ) {
   try {
     const ai = getAI();
-    const prompt = `Crie uma Atividade Extra de ${subject} (${grade} série) sobre: "${theme}".
+    const prompt = `Crie uma Atividade Extra de ${subject} (${grade} série) sobre o tema: "${theme}".
     
     REQUISITOS:
-    1. Gere exatamente 5 questões (mescla de múltipla escolha e abertas).
-    2. Questões abertas (type: "open") não devem ter options nem correctAnswer.
-    3. Use citações (citation) e descrições de imagens (visualDescription).
+    1. Gere 5 questões mesclando múltipla escolha e abertas.
+    2. Use citações textuais (citation) ricas em conteúdo histórico/filosófico para cada questão.
+    3. Foque na análise crítica do texto. Não utilize referências visuais.
     
     FORMATO JSON ESTRITO:
     [{ 
       "id": "string",
-      "citation": "texto base",
-      "visualDescription": "descricao_imagem_se_houver",
-      "question": "comando", 
+      "citation": "texto base rico",
+      "question": "comando interpretativo", 
       "type": "multiple" ou "open", 
       "options": ["opção A", "opção B", "opção C", "opção D"], 
       "correctAnswer": 0 
@@ -104,7 +101,6 @@ export async function generateExtraActivity(
             properties: {
               id: { type: Type.STRING },
               citation: { type: Type.STRING },
-              visualDescription: { type: Type.STRING, nullable: true },
               question: { type: Type.STRING },
               type: { type: Type.STRING },
               options: { type: Type.ARRAY, items: { type: Type.STRING }, nullable: true },
@@ -129,7 +125,7 @@ export async function evaluateActivitySubmission(
 ): Promise<{ score: number; feedback: string }> {
   try {
     const ai = getAI();
-    const prompt = `Aja como professor. Corrija a atividade: ${JSON.stringify(activity)}. Respostas: ${JSON.stringify(studentAnswers)}. Retorne JSON: { "score": 0-10, "feedback": "texto" }`;
+    const prompt = `Aja como professor de Ciências Humanas. Corrija a atividade: ${JSON.stringify(activity)}. Respostas enviadas pelo aluno: ${JSON.stringify(studentAnswers)}. Avalie o domínio do conteúdo e a capacidade de interpretação. Retorne JSON: { "score": 0-10, "feedback": "texto explicativo" }`;
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: prompt,
@@ -148,10 +144,10 @@ export async function generateAIFeedback(
 ): Promise<string> {
   try {
     const ai = getAI();
-    const prompt = `Gere feedback pedagógico para aluno de ${subject}. Questões: ${JSON.stringify(questions)}. Respostas: ${JSON.stringify(answers)}.`;
+    const prompt = `Gere um feedback pedagógico motivador e analítico para um aluno de ${subject}. Analise o desempenho baseado nestas questões: ${JSON.stringify(questions)} e nestas respostas: ${JSON.stringify(answers)}. Foque em pontos de melhoria na interpretação de textos.`;
     const response = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
-    return response.text || "Continue estudando!";
+    return response.text || "Continue estudando seus textos base!";
   } catch (error) {
-    return "Feedback indisponível.";
+    return "Feedback indisponível no momento.";
   }
 }

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Subject, Question, UserProfile } from '../types';
-import { AlertCircle, CheckCircle2, XCircle, Sparkles, Quote, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, XCircle, Sparkles, Quote, Loader2 } from 'lucide-react';
 import { generateAIFeedback } from '../services/geminiService';
 import { supabase } from '../lib/supabase';
 
@@ -121,12 +121,6 @@ const AssessmentSession: React.FC<AssessmentSessionProps> = ({ subject, isMock, 
           {q.citation && (
             <div className="mb-8 border-l-4 border-blue-600 pl-8 space-y-4">
               <div className="text-slate-600 italic text-xl leading-relaxed font-medium">"{q.citation}"</div>
-            </div>
-          )}
-          {q.visualDescription && (
-            <div className="mb-8 bg-slate-50 rounded-[24px] p-8 border border-slate-100">
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-3"><ImageIcon size={14}/> Descrição da Imagem/Gráfico</p>
-               <div className="p-4 bg-white border border-dashed rounded-xl text-slate-500 text-sm italic">{q.visualDescription}</div>
             </div>
           )}
           <h3 className="text-2xl font-black text-slate-800 mb-10 leading-tight">{q.text}</h3>
