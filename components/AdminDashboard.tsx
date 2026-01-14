@@ -116,7 +116,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
       alert("Você não pode excluir seu próprio usuário.");
       return;
     }
-    if (!confirm("Tem certeza que deseja excluir este usuário permanentemente?")) return;
+    if (!confirm("Tem certeza que deseja excluir este usuário? Todas as notas e atividades dele serão apagadas automaticamente.")) return;
     
     setLoading(true);
     try {
@@ -124,7 +124,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
       if (error) throw error;
       fetchUsers();
     } catch (err: any) {
-      alert("Erro ao excluir: " + err.message);
+      alert("Erro ao excluir: " + err.message + "\n\nSe o erro persistir, execute o script de 'Reparo SQL' na aba correspondente.");
     } finally {
       setLoading(false);
     }
@@ -142,15 +142,56 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
     } catch (err: any) { alert(err.message); } finally { setGenLoading(null); }
   };
 
-  const SQL_CODE = `-- MASTER SCRIPT FREDERICO - EXECUTE NO SQL EDITOR
--- ADICIONA COLUNA SUBJECT SE NÃO EXISTIR
-DO $$ 
-BEGIN 
+  const SQL_CODE = `-- MASTER SCRIPT FREDERICO - REPARAÇÃO DE VÍNCULOS
+-- Este script força a exclusão em cascata para evitar erros de Foreign Key.
+
+-- 1. Garantir coluna subject
+DO $$ BEGIN 
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='subject') THEN
         ALTER TABLE profiles ADD COLUMN subject TEXT;
     END IF;
 END $$;
 
+-- 2. Corrigir Vínculos das Tabelas Existentes (Drop e Re-add com CASCADE)
+DO $$ BEGIN
+    -- Corrigir Assessments
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='assessments_student_id_fkey') THEN
+        ALTER TABLE assessments DROP CONSTRAINT assessments_student_id_fkey;
+    END IF;
+    ALTER TABLE assessments ADD CONSTRAINT assessments_student_id_fkey FOREIGN KEY (student_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+    -- Corrigir Topics
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='topics_teacher_id_fkey') THEN
+        ALTER TABLE topics DROP CONSTRAINT topics_teacher_id_fkey;
+    END IF;
+    ALTER TABLE topics ADD CONSTRAINT topics_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+    -- Corrigir Extra Activities
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='extra_activities_teacher_id_fkey') THEN
+        ALTER TABLE extra_activities DROP CONSTRAINT extra_activities_teacher_id_fkey;
+    END IF;
+    ALTER TABLE extra_activities ADD CONSTRAINT extra_activities_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+    -- Corrigir Submissions
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='activity_submissions_student_id_fkey') THEN
+        ALTER TABLE activity_submissions DROP CONSTRAINT activity_submissions_student_id_fkey;
+    END IF;
+    ALTER TABLE activity_submissions ADD CONSTRAINT activity_submissions_student_id_fkey FOREIGN KEY (student_id) REFERENCES profiles(id) ON DELETE CASCADE;
+
+    -- Corrigir Observations (Student)
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='student_observations_student_id_fkey') THEN
+        ALTER TABLE student_observations DROP CONSTRAINT student_observations_student_id_fkey;
+    END IF;
+    ALTER TABLE student_observations ADD CONSTRAINT student_observations_student_id_fkey FOREIGN KEY (student_id) REFERENCES profiles(id) ON DELETE CASCADE;
+    
+    -- Corrigir Observations (Teacher)
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='student_observations_teacher_id_fkey') THEN
+        ALTER TABLE student_observations DROP CONSTRAINT student_observations_teacher_id_fkey;
+    END IF;
+    ALTER TABLE student_observations ADD CONSTRAINT student_observations_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES profiles(id) ON DELETE CASCADE;
+END $$;
+
+-- 3. Criar tabelas se não existirem (com definições seguras)
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT UNIQUE NOT NULL,
@@ -159,74 +200,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     role TEXT NOT NULL DEFAULT 'student',
     grade TEXT,
     class_name TEXT,
-    subject TEXT, -- Nova coluna para vincular professor à disciplina
-    phone TEXT,
-    avatar_url TEXT,
-    cheating_locked BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS topics (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    teacher_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-    subject TEXT NOT NULL,
-    grade TEXT NOT NULL,
-    quarter INTEGER NOT NULL,
-    content TEXT NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS official_exams (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    subject TEXT NOT NULL,
-    grade TEXT NOT NULL,
-    quarter INTEGER NOT NULL,
-    questions JSONB NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(subject, grade, quarter)
-);
-
-CREATE TABLE IF NOT EXISTS assessments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    student_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-    subject TEXT NOT NULL,
-    quarter INTEGER NOT NULL,
-    grade TEXT,
-    questions JSONB NOT NULL,
-    answers JSONB,
-    score NUMERIC(4,2),
-    is_mock BOOLEAN DEFAULT FALSE,
-    feedback TEXT,
-    cheating_attempts INTEGER DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS extra_activities (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    teacher_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-    subject TEXT NOT NULL,
-    grade TEXT NOT NULL,
-    class_name TEXT,
-    theme TEXT NOT NULL,
-    questions JSONB NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS activity_submissions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    activity_id UUID REFERENCES extra_activities(id) ON DELETE CASCADE,
-    student_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-    answers JSONB NOT NULL,
-    score NUMERIC(4,2),
-    feedback TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS student_observations (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    student_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-    teacher_id UUID REFERENCES profiles(id),
-    content TEXT NOT NULL,
+    subject TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -239,6 +213,7 @@ CREATE TABLE IF NOT EXISTS global_settings (
 
 INSERT INTO global_settings (id, active_quarter) VALUES (1, 1) ON CONFLICT DO NOTHING;
 
+-- Desativar RLS para facilitar gestão administrativa
 ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE topics DISABLE ROW LEVEL SECURITY;
 ALTER TABLE official_exams DISABLE ROW LEVEL SECURITY;
@@ -411,8 +386,8 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
             <div className="bg-amber-50 border border-amber-200 p-8 rounded-[32px] flex items-start gap-4">
               <AlertCircle className="text-amber-500 shrink-0" size={24}/>
               <div className="space-y-1">
-                <p className="font-black text-amber-800 uppercase text-xs tracking-widest">Utilitário de Reparação</p>
-                <p className="text-amber-700 text-sm">Se o sistema estiver instável ou tabelas estiverem faltando, copie o código abaixo e execute no "SQL Editor" do seu painel Supabase.</p>
+                <p className="font-black text-amber-800 uppercase text-xs tracking-widest">Utilitário de Reparação Crítica</p>
+                <p className="text-amber-700 text-sm">Se você não consegue excluir usuários devido a "Foreign Key Constraints" (Vínculos de Notas), execute este script. Ele forçará que ao excluir um usuário, todas as notas e registros vinculados a ele sumam automaticamente (ON DELETE CASCADE).</p>
               </div>
             </div>
             <div className="relative group">
@@ -431,7 +406,7 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
               onClick={() => { navigator.clipboard.writeText(SQL_CODE); alert("Script Copiado!"); }} 
               className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black flex justify-center items-center gap-2 hover:bg-slate-800 transition-all shadow-xl"
             >
-              <Copy size={20}/> COPIAR SCRIPT COMPLETO
+              <Copy size={20}/> COPIAR SCRIPT DE CORREÇÃO
             </button>
           </div>
         )}
