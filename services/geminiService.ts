@@ -36,7 +36,7 @@ export async function generateEnemAssessment(
     }]`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -93,7 +93,7 @@ export async function generateExtraActivity(
     }]`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -131,7 +131,7 @@ export async function evaluateActivitySubmission(
     const ai = getAI();
     const prompt = `Aja como professor. Corrija a atividade: ${JSON.stringify(activity)}. Respostas: ${JSON.stringify(studentAnswers)}. Retorne JSON: { "score": 0-10, "feedback": "texto" }`;
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: "gemini-3-flash-preview",
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });
@@ -149,7 +149,7 @@ export async function generateAIFeedback(
   try {
     const ai = getAI();
     const prompt = `Gere feedback pedagógico para aluno de ${subject}. Questões: ${JSON.stringify(questions)}. Respostas: ${JSON.stringify(answers)}.`;
-    const response = await ai.models.generateContent({ model: "gemini-3-pro-preview", contents: prompt });
+    const response = await ai.models.generateContent({ model: "gemini-3-flash-preview", contents: prompt });
     return response.text || "Continue estudando!";
   } catch (error) {
     return "Feedback indisponível.";
