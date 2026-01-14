@@ -27,7 +27,6 @@ const CLASSES_BY_GRADE: { [key: string]: string[] } = {
 const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settings }) => {
   const [activeTab, setActiveTab] = useState<'topics' | 'activities' | 'carometro' | 'official_results'>('topics');
   
-  // Seletor de Disciplina Ativa (Contexto)
   const teacherSubjects = currentUser.subjects || [];
   const [selectedSubject, setSelectedSubject] = useState<Subject>(teacherSubjects[0] || 'História');
   
@@ -54,7 +53,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
   useEffect(() => {
     fetchMyTopics();
     fetchMyActivities();
-  }, [selectedSubject]); // Recarrega quando a disciplina ativa muda
+  }, [selectedSubject]);
 
   useEffect(() => {
     if (activeTab === 'carometro') fetchStudents();
@@ -66,7 +65,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
       .from('topics')
       .select('*')
       .eq('teacher_id', currentUser.id)
-      .eq('subject', selectedSubject) // Filtra por disciplina
+      .eq('subject', selectedSubject)
       .order('created_at', { ascending: false });
     if (data) setMyTopicsHistory(data);
   };
@@ -76,7 +75,7 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
       .from('extra_activities')
       .select('*')
       .eq('teacher_id', currentUser.id)
-      .eq('subject', selectedSubject) // Filtra por disciplina
+      .eq('subject', selectedSubject)
       .order('created_at', { ascending: false });
     if (data) setMyActivities(data.map(d => ({ ...d, teacherId: d.teacher_id, createdAt: d.created_at })));
   };
@@ -152,6 +151,49 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
     setSelectedStudent(student);
   };
 
+  const handleGenerateExtra = async () => {
+    if(!extraTheme) { alert("Por favor, digite um tema."); return; }
+    setLoading(true);
+    setGenQuestions(null);
+    try {
+      const qs = await generateExtraActivity(selectedSubject, extraTheme, selectedGrade);
+      if (qs && qs.length > 0) {
+        setGenQuestions(qs);
+        console.log("IA Frederico gerou:", qs);
+      } else {
+        alert("A IA Frederico retornou uma lista vazia. Tente mudar o tema ou a série.");
+      }
+    } catch(e: any) { 
+      console.error("Erro no Dashboard ao gerar atividade:", e);
+      alert("Falha na geração: " + e.message); 
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePublishActivity = async () => {
+    if (!genQuestions) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('extra_activities').insert([{ 
+          teacher_id: currentUser.id, 
+          subject: selectedSubject, 
+          grade: selectedGrade, 
+          theme: extraTheme, 
+          questions: genQuestions 
+      }]);
+      if (error) throw error;
+      setGenQuestions(null); 
+      setExtraTheme(''); 
+      fetchMyActivities();
+      alert("Atividade extra publicada para os alunos!");
+    } catch (e: any) {
+      alert("Erro ao publicar: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-slate-900 rounded-[32px] p-8 text-white flex flex-col md:flex-row justify-between items-center gap-6 shadow-xl relative overflow-hidden">
@@ -208,8 +250,8 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                 value={editingTopicId ? editTopicContent : newTopic} 
                 onChange={(e) => editingTopicId ? setEditTopicContent(e.target.value) : setNewTopic(e.target.value)} 
               />
-              <button onClick={editingTopicId ? handleUpdateTopic : handleSaveTopic} className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl flex justify-center gap-2">
-                {editingTopicId ? <Save size={18}/> : <Send size={18}/>} 
+              <button onClick={editingTopicId ? handleUpdateTopic : handleSaveTopic} disabled={loading} className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl flex justify-center gap-2 disabled:opacity-50">
+                {loading ? <Loader2 className="animate-spin"/> : editingTopicId ? <Save size={18}/> : <Send size={18}/>} 
                 {editingTopicId ? 'Salvar Alterações' : 'Enviar Planejamento'}
               </button>
             </div>
@@ -226,6 +268,44 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
                       </div>
                     </div>
                     <p className="text-xs text-slate-600 italic line-clamp-3">"{t.content}"</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'activities' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-200 space-y-4">
+              <h3 className="font-black text-slate-800 text-xl tracking-tighter">Gerar Atividade - {selectedSubject}</h3>
+              <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Mistura questões abertas e fechadas</p>
+              <input className="w-full p-4 border rounded-2xl bg-white outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: A crise de 1929 e o New Deal..." value={extraTheme} onChange={e => setExtraTheme(e.target.value)}/>
+              <button onClick={handleGenerateExtra} disabled={loading} className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl flex justify-center gap-2 hover:bg-blue-700 transition-all shadow-lg disabled:opacity-50">
+                {loading ? <Loader2 className="animate-spin"/> : <Wand2 size={20}/>} Criar Atividade com IA
+              </button>
+              {genQuestions && (
+                <div className="space-y-4 animate-fade-in pt-4 border-t border-slate-200">
+                  <div className="bg-green-50 p-4 rounded-2xl flex items-center gap-3 border border-green-100">
+                    <CheckCircle className="text-green-500" size={20}/>
+                    <p className="text-xs font-bold text-green-700">5 questões geradas com sucesso!</p>
+                  </div>
+                  <button onClick={handlePublishActivity} disabled={loading} className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl shadow-xl hover:scale-105 transition-all disabled:opacity-50">
+                    PUBLICAR PARA OS ALUNOS
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="space-y-4">
+              <h4 className="font-black text-slate-400 uppercase text-[10px] tracking-widest flex items-center gap-2 mb-4">Publicadas ({selectedSubject})</h4>
+              <div className="space-y-3 overflow-y-auto max-h-[500px]">
+                {myActivities.map(act => (
+                  <div key={act.id} className="p-5 bg-white border rounded-3xl flex justify-between items-center group shadow-sm hover:border-blue-100 transition-all">
+                    <div>
+                      <p className="font-black text-slate-800 text-sm tracking-tight">{act.theme}</p>
+                      <p className="text-[9px] uppercase font-black text-slate-400 tracking-widest">{act.grade} Série</p>
+                    </div>
+                    <button onClick={() => handleDeleteActivity(act.id)} className="text-red-400 p-2 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16}/></button>
                   </div>
                 ))}
               </div>
@@ -259,38 +339,98 @@ const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ currentUser, settin
           </div>
         )}
 
-        {activeTab === 'activities' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-200 space-y-4">
-              <h3 className="font-black text-slate-800 text-xl tracking-tighter">Gerar Atividade - {selectedSubject}</h3>
-              <input className="w-full p-4 border rounded-2xl" placeholder="Tema crítico..." value={extraTheme} onChange={e => setExtraTheme(e.target.value)}/>
-              <button onClick={async () => {
-                if(!extraTheme) return;
-                setLoading(true);
-                try {
-                  const qs = await generateExtraActivity(selectedSubject, extraTheme, selectedGrade);
-                  setGenQuestions(qs);
-                } catch(e: any) { alert(e.message); }
-                setLoading(false);
-              }} className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl">
-                {loading ? <Loader2 className="animate-spin"/> : <Wand2 size={20}/>} Criar com IA
-              </button>
-            </div>
-            <div className="space-y-4">
-              <h4 className="font-black text-slate-400 uppercase text-[10px] tracking-widest flex items-center gap-2 mb-4">Publicadas ({selectedSubject})</h4>
-              {myActivities.map(act => (
-                <div key={act.id} className="p-5 bg-white border rounded-3xl flex justify-between items-center group shadow-sm">
-                  <div>
-                    <p className="font-black text-slate-800">{act.theme}</p>
-                    <p className="text-[9px] uppercase font-black text-slate-400">{act.grade} Série</p>
-                  </div>
-                  <button onClick={() => handleDeleteActivity(act.id)} className="text-red-400 p-2 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16}/></button>
-                </div>
-              ))}
-            </div>
-          </div>
+        {activeTab === 'carometro' && (
+           <div className="space-y-8">
+               <div className="flex justify-between items-center bg-slate-50 p-6 rounded-[32px] border border-slate-100">
+                    <div>
+                        <h4 className="font-black text-slate-800 text-lg tracking-tight uppercase">Explorar Estudantes</h4>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Carregando identidades visuais dos alunos</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <select className="px-3 py-2 bg-white border rounded-xl font-bold text-xs" value={selectedGrade} onChange={(e) => setSelectedGrade(e.target.value)}>
+                            <option>1ª</option><option>2ª</option><option>3ª</option>
+                        </select>
+                        <select className="px-3 py-2 bg-white border rounded-xl font-bold text-xs" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
+                            <option value="Todas">Todas Turmas</option>
+                            {CLASSES_BY_GRADE[selectedGrade]?.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+               </div>
+               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+                {students.map(s => (
+                    <div key={s.id} onClick={() => handleOpenStudent(s)} className="text-center cursor-pointer group">
+                    <div className="aspect-[3/4] rounded-[24px] overflow-hidden border-4 border-white group-hover:border-blue-500 transition-all mb-2 shadow-xl">
+                        {s.avatarUrl ? <img src={s.avatarUrl} className="w-full h-full object-cover"/> : <div className="w-full h-full bg-slate-100 flex items-center justify-center text-slate-300"><User size={40}/></div>}
+                    </div>
+                    <p className="text-[10px] font-black uppercase text-slate-700 tracking-tighter line-clamp-1">{s.fullName}</p>
+                    </div>
+                ))}
+               </div>
+           </div>
         )}
       </div>
+
+      {viewingAssessment && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-4xl rounded-[48px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fade-in">
+            <div className="p-8 bg-slate-900 text-white flex justify-between items-center no-print">
+              <div className="flex items-center gap-4">
+                <div className="bg-blue-600 p-2 rounded-xl"><User size={20}/></div>
+                <div>
+                    <h3 className="font-black text-xl tracking-tighter uppercase">{viewingAssessment.studentName}</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{viewingAssessment.subject} • Bimestre {viewingAssessment.quarter}</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <button onClick={window.print} className="p-3 bg-white/10 rounded-full hover:bg-white/20 transition-all"><Printer size={20}/></button>
+                <button onClick={() => setViewingAssessment(null)} className="p-3 bg-white/10 rounded-full hover:bg-white/20 transition-all"><X size={20}/></button>
+              </div>
+            </div>
+
+            <div className="p-10 overflow-y-auto space-y-10 print:p-0">
+               <div className="flex justify-between border-b pb-8">
+                  <div>
+                    <h4 className="font-black text-3xl text-slate-800 tracking-tighter">Relatório de Desempenho</h4>
+                    <p className="text-blue-600 font-black text-xl">Nota: {viewingAssessment.score.toFixed(1)} / 10.0</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-300 uppercase">Data de Realização</p>
+                    <p className="font-bold text-slate-600">{new Date(viewingAssessment.created_at).toLocaleDateString()}</p>
+                  </div>
+               </div>
+
+               <div className="space-y-12">
+                  {viewingAssessment.questions?.map((q: Question, i: number) => {
+                    const studentAns = viewingAssessment.answers ? viewingAssessment.answers[i] : -1;
+                    const isCorrect = studentAns === q.correctIndex;
+                    return (
+                      <div key={i} className="space-y-4 border-b border-slate-50 pb-10 last:border-0 page-break-inside-avoid">
+                         <div className="flex justify-between">
+                            <span className="bg-slate-900 text-white text-[9px] font-black px-3 py-1 rounded-lg uppercase tracking-widest">Questão {i+1}</span>
+                            <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase tracking-widest ${isCorrect ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>{isCorrect ? 'RESPOSTA CORRETA' : 'RESPOSTA INCORRETA'}</span>
+                         </div>
+                         {q.citation && <div className="p-4 bg-slate-50 border-l-2 border-blue-600 italic text-slate-600 text-sm leading-relaxed rounded-r-xl">"{q.citation}"</div>}
+                         <p className="font-black text-slate-800 text-lg leading-tight">{q.text}</p>
+                         <div className="grid gap-2">
+                           {q.options.map((opt, oIdx) => (
+                             <div key={oIdx} className={`p-4 rounded-xl border text-xs flex items-center gap-4 transition-all ${oIdx === q.correctIndex ? 'bg-green-50 border-green-200 text-green-800 font-bold' : oIdx === studentAns ? 'bg-red-50 border-red-200 text-red-800 font-bold' : 'bg-white border-slate-100 text-slate-400'}`}>
+                               <span className={`w-8 h-8 flex items-center justify-center rounded-lg font-black ${oIdx === q.correctIndex ? 'bg-green-600 text-white' : oIdx === studentAns ? 'bg-red-600 text-white' : 'bg-slate-100'}`}>{String.fromCharCode(65+oIdx)}</span> {opt}
+                               {oIdx === q.correctIndex && <CheckCircle size={14} className="ml-auto text-green-600"/>}
+                             </div>
+                           ))}
+                         </div>
+                         <div className="p-5 bg-blue-50/50 rounded-2xl border border-blue-100">
+                           <p className="text-[9px] font-black text-blue-500 uppercase mb-2 tracking-widest">Análise Pedagógica</p>
+                           <p className="text-xs text-slate-600 italic leading-relaxed">"{q.explanation}"</p>
+                         </div>
+                      </div>
+                    )
+                  })}
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
