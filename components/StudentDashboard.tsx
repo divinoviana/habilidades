@@ -94,6 +94,21 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ currentUser, settin
     try {
       const result = await evaluateActivitySubmission(selectedActivity, activityAnswers);
       setActivityResult(result);
+      
+      // Salva a submissão no banco de dados para que o professor possa ver
+      const { error } = await supabase.from('activity_submissions').insert([{
+        activity_id: selectedActivity.id,
+        student_id: currentUser.id,
+        answers: activityAnswers,
+        score: result.score,
+        feedback: result.feedback,
+        subject: selectedActivity.subject,
+        grade: selectedActivity.grade,
+        theme: selectedActivity.theme
+      }]);
+      
+      if (error) console.error("Erro ao persistir atividade:", error);
+      
     } catch (e: any) {
       alert("Erro ao corrigir: " + e.message);
     } finally {
