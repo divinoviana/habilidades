@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { UserProfile, GlobalSettings, UserRole, Subject, Topic } from '../types';
-import { Users, Lock, Unlock, Calendar, Trash2, ShieldAlert, KeyRound, Loader2, RefreshCw, Sparkles, Wand2, ChevronLeft, AlertCircle, BookOpen, Clock, Database, Copy, Search, UserCheck, UserMinus, UserPlus, X, Mail, Shield, Briefcase, CheckCircle2, User as UserIcon, Plus, GraduationCap, Book } from 'lucide-react';
+import { Users, Lock, Unlock, Calendar, Trash2, ShieldAlert, KeyRound, Loader2, RefreshCw, Sparkles, Wand2, ChevronLeft, AlertCircle, BookOpen, Clock, Database, Copy, Search, UserCheck, UserMinus, UserPlus, X, Mail, Shield, Briefcase, CheckCircle2, User as UserIcon, Plus, GraduationCap, Book, Key } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { generateEnemAssessment } from '../services/geminiService';
 
@@ -37,6 +37,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
     className: '13.01',
     subject: SUBJECTS[0]
   });
+
+  // States para gerenciar senha
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [newPassword, setNewPassword] = useState('');
 
   useEffect(() => {
     fetchUsers();
@@ -125,6 +130,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentUser, settings, 
       fetchUsers();
     } catch (err: any) {
       alert("Erro ao excluir: " + err.message + "\n\nSe o erro persistir, execute o script de 'Reparo SQL' na aba correspondente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser || !newPassword) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ password: newPassword })
+        .eq('id', selectedUser.id);
+
+      if (error) throw error;
+      
+      alert(`Senha de ${selectedUser.fullName} alterada com sucesso!`);
+      setShowPasswordModal(false);
+      setNewPassword('');
+      setSelectedUser(null);
+    } catch (err: any) {
+      alert("Erro ao alterar senha: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -322,6 +350,13 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
 
                   <div className="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
+                      onClick={() => { setSelectedUser(u); setShowPasswordModal(true); }} 
+                      className="p-2 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-500 hover:text-white transition-all shadow-sm"
+                      title="Alterar Senha"
+                    >
+                      <Key size={16}/>
+                    </button>
+                    <button 
                       onClick={() => handleDeleteUser(u.id)} 
                       className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-sm"
                       title="Excluir Usuário"
@@ -411,6 +446,48 @@ ALTER TABLE global_settings DISABLE ROW LEVEL SECURITY;`;
           </div>
         )}
       </div>
+
+      {/* Modal Alterar Senha */}
+      {showPasswordModal && selectedUser && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden animate-fade-in">
+            <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-black uppercase tracking-tighter text-lg">Gerenciar Senha</h3>
+                <p className="text-slate-400 text-[9px] font-bold uppercase tracking-widest">{selectedUser.fullName}</p>
+              </div>
+              <button onClick={() => { setShowPasswordModal(false); setSelectedUser(null); }} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X size={20}/></button>
+            </div>
+            <form onSubmit={handleUpdatePassword} className="p-8 space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-2 tracking-widest">Nova Senha de Acesso</label>
+                <div className="relative">
+                   <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
+                   <input 
+                    required 
+                    type="text" 
+                    placeholder="Digite a nova senha..." 
+                    className="w-full pl-12 pr-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold" 
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <button type="button" onClick={() => setShowPasswordModal(false)} className="flex-1 font-black text-slate-400 uppercase text-[10px]">Cancelar</button>
+                <button 
+                  type="submit" 
+                  disabled={loading || !newPassword}
+                  className="flex-[2] bg-blue-600 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {loading ? <Loader2 className="animate-spin" size={16}/> : <CheckCircle2 size={16}/>}
+                  ATUALIZAR
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal Adicionar Usuário */}
       {showAddModal && (
