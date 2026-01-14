@@ -129,15 +129,15 @@ export async function evaluateActivitySubmission(
 ): Promise<{ score: number; feedback: string }> {
   try {
     const ai = getAI();
-    const prompt = `Corrija esta atividade. JSON Atividade: ${JSON.stringify(activity)}. Respostas Aluno: ${JSON.stringify(studentAnswers)}. Retorne JSON: { "score": 0-10, "feedback": "texto" }`;
+    const prompt = `Aja como professor. Corrija a atividade: ${JSON.stringify(activity)}. Respostas: ${JSON.stringify(studentAnswers)}. Retorne JSON: { "score": 0-10, "feedback": "texto" }`;
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: prompt,
       config: { responseMimeType: "application/json" }
     });
-    return JSON.parse(response.text || '{"score":0,"feedback":"Erro."}');
+    return JSON.parse(response.text || '{"score":0,"feedback":"Erro na correção."}');
   } catch (error) {
-    return { score: 0, feedback: "Erro na correção automática." };
+    return { score: 0, feedback: "Falha na correção automática." };
   }
 }
 
@@ -148,9 +148,9 @@ export async function generateAIFeedback(
 ): Promise<string> {
   try {
     const ai = getAI();
-    const prompt = `Feedback para aluno de ${subject}. Questões: ${JSON.stringify(questions)}. Respostas: ${JSON.stringify(answers)}. Seja encorajador e aponte o que estudar para o ENEM.`;
+    const prompt = `Gere feedback pedagógico para aluno de ${subject}. Questões: ${JSON.stringify(questions)}. Respostas: ${JSON.stringify(answers)}.`;
     const response = await ai.models.generateContent({ model: "gemini-3-pro-preview", contents: prompt });
-    return response.text || "Feedback indisponível.";
+    return response.text || "Continue estudando!";
   } catch (error) {
     return "Feedback indisponível.";
   }
